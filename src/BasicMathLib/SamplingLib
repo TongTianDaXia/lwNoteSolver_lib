@@ -1,0 +1,48 @@
+!This lib is used to sample from a prescribed distribution
+    
+module samplinglib
+use constants
+implicit none
+
+    private
+    
+    public::    sampleAR
+
+    
+    
+    
+    
+!--------------------------------------------------
+    interface sampleAR                            ! the acceptance-rejection method
+        procedure:: sampleAR_discrete
+        procedure:: sampleAR_continuous
+    end interface 
+    
+
+    
+contains
+
+!-------------------------------------------------
+
+    pure integer(ip) function sampleAR_discrete(f1,fmax,xmin,xmax) result(x)
+    procedure(absf1)::          f1        !the probability density function that is needed to input
+    real(rp),intent(in)::       fmax
+    integer(ip),intent(in)::    xmin,xmax
+        do while(.true.)
+            x = xmin + int((ranf() / (2.d0 ** 31.d0 - 1.d0))*dfloat(xmax+1-xmin))
+            if(f1(dfloat(x)) / fmax.gt.ranf() / (2.d0 ** 31.d0 - 1.d0)) exit
+        end do
+    end function sampleAR_discrete
+    
+!-------------------------------------------------
+    
+    pure real(rp) function sampleAR_continuous(f1,fmax,xmin,xmax) result(x)
+    procedure(absf1)::          f1
+    real(rp),intent(in)::       fmax,xmin,xmax
+        do while(.true.)
+            x = xmin + (ranf() / (2.d0 ** 31.d0 - 1.d0)) * (xmax-xmin)
+            if(f1(x) / fmax.gt.ranf() / (2.d0 ** 31.d0 - 1.d0)) exit
+        end do
+    end function sampleAR_continuous
+    
+end module samplinglib
