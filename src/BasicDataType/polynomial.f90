@@ -13,6 +13,8 @@ implicit none
     !some related polynomials and function
     !--zero
     public:: zeroPolynomial
+    !--
+    public:: multiPolynominal
     !--Legendre, use recursive method rather than explict expression to avoid failure of large n for binomialCoef/factorial method
     public:: LegendrePolynomial
     public:: LegendrePolynomialSet
@@ -77,8 +79,6 @@ implicit none
 
     end type polynomial
 
-    
-    
 !---------------------------------------------------------------------
     interface integrate
         procedure:: integratePolynomial
@@ -100,6 +100,14 @@ implicit none
         procedure:: normalHermiteProbPolynomialSet
     end interface normalHermitePolynomialSet
     !---------------------------
+    interface multiPolynominal
+        procedure:: multiPolynominal_Poly
+        procedure:: multiPolynominal_Polyval
+        procedure:: multiPolynominal_heterPoly
+        procedure:: multiPolynominal_heterPolyval
+    end interface
+    
+    
 contains
 
 
@@ -655,6 +663,58 @@ contains
             poly(i) = (1._rp / sqrt(sqrt(2._rp) * spi * factorial(n))) * poly(i)
         enddo
     end function normalHermiteProbPolynomialSet
+    
+    
+    !--
+    pure type(polynomial) function multiPolynominal_poly(sPolynomial,alpha) result(mp)
+    type(polynomial),dimension(0:),intent(in)::         sPolynomial
+    integer(ip),dimension(:),intent(in)::               alpha
+    integer(ip)::                                       i
+
+        mp = [1._rp]
+        do i=1,size(alpha)
+            mp = mp * sPolynomial(alpha(i))
+        end do
+        
+    end function multiPolynominal_poly
+    
+    pure type(polynomial) function multiPolynominal_heterPoly(sPolynomial,alpha) result(mp)
+    type(polynomial),dimension(0:,:),intent(in)::       sPolynomial
+    integer(ip),dimension(:),intent(in)::               alpha
+    integer(ip)::                                       i
+    
+        mp = [1._rp]
+        do i=1,size(alpha)
+            mp = mp * sPolynomial(alpha(i),i)
+        end do
+        
+    end function multiPolynominal_heterPoly
+    
+    pure real(rp) function multiPolynominal_polyval(sPolynomial,alpha,x) result(val)
+    type(polynomial),dimension(0:),intent(in)::         sPolynomial
+    integer(ip),dimension(:),intent(in)::               alpha
+    real(rp),intent(in)::                               x
+    integer(ip)::                                       i
+        
+        val = 1._rp
+        do i=size(alpha),1,-1   !high order lead to small value
+            val = val * sPolynomial(alpha(i))%funcval(x)
+        end do
+        
+    end function multiPolynominal_polyval
+    
+    pure real(rp) function multiPolynominal_heterPolyval(sPolynomial,alpha,x) result(val)
+    type(polynomial),dimension(0:,:),intent(in)::       sPolynomial
+    integer(ip),dimension(:),intent(in)::               alpha
+    real(rp),intent(in)::                               x
+    integer(ip)::                                       i
+        
+        val = 1._rp
+        do i=size(alpha),1,-1   !high order lead to small value
+            val = val * sPolynomial(alpha(i),i)%funcval(x)
+        end do
+        
+    end function multiPolynominal_heterPolyval
     
     
 end module polynomial_

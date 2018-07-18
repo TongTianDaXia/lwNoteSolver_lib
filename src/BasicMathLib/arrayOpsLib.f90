@@ -160,7 +160,7 @@ contains
     real(rp),intent(in)::               x
     integer(ip)::                       i
         polyval = 0._rp
-        if(x>1._rp) then
+        if(abs(x)>1._rp) then
             do i=0,ubound(a,1)
                 polyval = polyval + a(i) * x**i 
             enddo
@@ -333,12 +333,12 @@ contains
     end subroutine repmat_im
     
     
-    !computes the compositions of the integer n into k parts.
-    !like n=2, k=2: (2,0);(1,1);(0,2) | totally 3 kinds, and this subroutine accomplish this order for next
+    !computes the compositions of the integer n into k parts | dim(a)=k; sum(a)=|a|=n
+    !e.g. n=3, k=2: (3,0)(2,1)(1,2)(0,3) | totally 4 kinds, and this subroutine accomplish this order for next
     !On the first call to this routine, set MORE = FALSE.  The routine will compute the first element in the 
-    !sequence of compositions and return it, as well as setting MORE = TRUE.  If more compositions are desired, 
+    !sequence of compositions and return it, as well as setting MORE = TRUE.  If more compositions are desired
     !call again, and again.  Each time, the routine will return with a new composition.
-    !refer to http://people.sc.fsu.edu/~jburkardt/f_src/sandia_sparse/sandia_sparse.f90 %comp_next
+    !refer to http://people.sc.fsu.edu/~jburkardt/f_src/sandia_sparse/sandia_sparse.f90 |comp_next
     pure subroutine compositionNext(n,k,a,more,h,t)
     integer(ip),intent(in)::                n,k
     integer(ip),intent(inout)::             h,t
