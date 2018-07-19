@@ -8,8 +8,8 @@ implicit none
     public:: magSqr, mag, angle, normal, para, orth, rot2, norm, polyval
     public:: trace, diag, sort, cumprod, trans, repmat
     
-    !some special array structure
-    public:: compositionNext,colexNext
+    !indice ops
+    public:: compositionNext,combinationNext,colexNext
     
     !compress stored row
     public:: diagIxCsr
@@ -338,18 +338,21 @@ contains
     !On the first call to this routine, set MORE = FALSE.  The routine will compute the first element in the 
     !sequence of compositions and return it, as well as setting MORE = TRUE.  If more compositions are desired
     !call again, and again.  Each time, the routine will return with a new composition.
-    !refer to http://people.sc.fsu.edu/~jburkardt/f_src/sandia_sparse/sandia_sparse.f90 |comp_next
+    !refer to http://people.sc.fsu.edu/~jburkardt/f_src/subset/subset.f90 |comp_next
     pure subroutine compositionNext(n,k,a,more,h,t)
-    integer(ip),intent(in)::                n,k
-    integer(ip),intent(inout)::             h,t
-    integer(ip),dimension(k),intent(inout)::a
-    logical(lp),intent(inout)::             more
+    integer(ip),intent(in)::                    n,k
+    integer(ip),intent(inout)::                 h,t
+    integer(ip),dimension(k),intent(inout)::    a
+    logical(lp),intent(inout)::                 more
             
         if(.not.more) then
             t = n; h = 0
             a = 0; a(1) = n
         else
+            !if a(1) is positive, set h=0
             if(t>1) h = 0
+            !h is the entry increased last time
+            !add all but one of the value to a(1) and increamenting a(h+1) by 1
             h = h + 1
             t = a(h)
             a(h) = 0
@@ -359,6 +362,39 @@ contains
         more = a(k) /= n
         
     end subroutine compositionNext
+    
+    !--
+    !dim(a)=k, maxval(a)=n | n>k
+    pure subroutine combinationNext(n,k,a,more)
+    integer(ip),intent(in)::                n,k
+    integer(ip),dimension(k),intent(inout)::a
+    logical(lp),intent(inout)::             more
+    integer(ip)::                           i,j
+        
+        if(.not.more) then
+            do i=1,k
+                a(i) = i
+            enddo
+            more = n/=k
+        else
+            if(a(k)<n) then
+                a(k) = a(k) + 1
+                more = k/=1 .or. a(k)/=n
+            else
+                do i=k,2,-1
+                    if(a(i-1)<n-k+i-1) then
+                        a(i-1) = a(i-1) + 1
+                        do j=i,k
+                            a(j) = a(i-1) + j - (i-1)
+                        enddo
+                        more = a(1)/=n-k+1
+                        return
+                    endif
+                enddo
+            endif
+        endif
+
+    end subroutine combinationNext
     
     !-------------------------------------
     !    the vectors are produced in colexical order, starting with
