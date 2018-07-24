@@ -418,19 +418,21 @@ contains
     integer(ip),dimension(:),intent(in)::   base
     integer(ip),dimension(:),intent(inout)::a
     logical(lp),intent(inout)::             more
-    integer(ip)::                           i
+    integer(ip)::                           i,j
         if(.not.more) then
             a = 0; more = .true.
         else
             do i=1,n
                 a(i) = a(i) + 1
+                do j=n,1,-1
+                    if(a(j)/=base(j)-1) exit
+                    if(j==1) more = .false.
+                enddo
                 if(a(i)<base(i)) return
                 a(i) = 0
             enddo
-            more = .false.
         endif
     end subroutine colexNext
-    
     
     
 !------------------------------------------------------------------
