@@ -15,6 +15,9 @@ implicit none
     
     public:: integrate
     !--
+    public:: GaussCev   !based on the mkl symtridiag, more memory, more accurate
+    public:: GaussTom   !based on the ACM TOM, less memory, less accurate
+    !--
     public:: QuadratureRule
     public:: GaussLegendre
     public:: GaussHermite
@@ -128,6 +131,117 @@ contains
     end function simpson_f1
     
     
+!---------------------------------------------------------------------------------
+!quadrature rule related
+!---------------------------------------------------------------------------------
+    !refer to <Remark on algorithm 726: ORTHPOL---A package of routines for 
+    !           generating orthogonal polynomials and Gauss-type quadrature rules>
+    !P_{n+1} = (x-alpha_n)*P_n - beta_n*P_{n-1}
+    pure subroutine GaussCev(alpha,beta,quadx,quadw)
+    real(rp),dimension(:),intent(in)::  alpha,beta
+    real(rp),dimension(:),intent(out):: quadx,quadw
+    integer(ip)::                       n
+    real(rp),dimension(size(quadx),size(quadx))::ev   
+        
+        n = size(quadx)
+        quadx = alpha
+        quadw(1:n-1) = sqrt(beta(2:n))  !temp for edge
+        call eigenSymTriDiagonal(quadx,quadw,ev)
+        quadw = beta(1) * ev(1,:)**2
+    
+    end subroutine GaussCev
+    
+    !refer to http://people.sc.fsu.edu/~jburkardt/f_src/toms726/toms726.html
+    pure subroutine GaussTom(alpha,beta,quadx,quadw)
+    real(rp),dimension(:),intent(in)::  alpha,beta
+    real(rp),dimension(:),intent(out):: quadx,quadw
+    integer(ip)::                       i,j,k,l,m,m2,mml
+    real(rp)::                          b,c,f,g,p,r,s
+    real(rp),dimension(size(quadx))::   e
+    real(rp),parameter::                eps = 10._rp * GlobalEps
+    integer(ip)::                       n
+    
+        n = size(quadx)
+        
+        quadx(1) = alpha(1)
+        quadw(1) = beta(1)
+        if(n==1) return
+
+        quadw(1) = 1._rp
+        e(n) = 0._rp
+        !diag = alpha(1:n), edge = sqrt(beta(2:n))
+        do k = 2, n
+            quadx(k) = alpha(k)
+            e(k-1) = sqrt(beta(k))
+            quadw(k) = 0._rp
+        end do
+
+        !QR factor
+        do l = 1, n
+            j = 0
+            do
+                do m2 = l, n
+                    m = m2
+                    if(m==n) exit
+                    if(abs(e(m)) <= eps*(abs(quadx(m)) + abs(quadx(m+1)))) exit
+                end do
+
+                p = quadx(l)
+                if(m==l) exit
+                if(30 <= j) call disableprogram
+                j = j + 1
+                g = (quadx(l+1) - p)/(2._rp * e(l))
+                r = sqrt(g*g + 1._rp)
+                g = quadx(m) - p + e(l)/(g + sign(r,g))
+                s = 1._rp
+                c = 1._rp
+                p = 0._rp
+                mml = m - l
+
+                do i = m-1, 1, -1
+                    f = s * e(i)
+                    b = c * e(i)
+                    if (abs(f) < abs(g)) then
+                        s = f / g
+                        r = sqrt(s*s + 1._rp)
+                        e(i+1) = g * r
+                        c = 1._rp / r
+                        s = s * c
+                    else
+                        c = g / f
+                        r = sqrt(c*c + 1._rp)
+                        e(i+1) = f * r
+                        s = 1._rp / r
+                        c = c * s
+                    end if
+                    g = quadx(i+1) - p
+                    r = (quadx(i) - g)*s + 2._rp*c*b
+                    p = s * r
+                    quadx(i+1) = g + p
+                    g = c * r - b
+                    f = quadw(i+1)
+                    quadw(i+1) = s * quadw(i) + c * f
+                    quadw(i) = c * quadw(i) - s * f
+                end do
+                
+                quadx(l) = quadx(l) - p
+                e(l) = g
+                e(m) = 0._rp
+            end do
+        end do
+
+        !sorting
+        do i=1,n-1
+            k = minloc(quadx(i:n),1)
+            if(k/=1) then
+                call swap(quadx(i),quadx(k+i-1))
+                call swap(quadw(i),quadw(k+i-1))
+            endif
+        enddo
+        quadw(1:n) = beta(1) * quadw(1:n)**2
+    
+    end subroutine GaussTom
+    
     
     !-------------------------------------------------
     real(rp) function integrateQuadratureRule(f,ruleType,Order,normalCoef) result(r)
@@ -163,6 +277,7 @@ contains
         end select
         
     end subroutine quadratureRule
+    
     
 !refer to https://github.com/chebfun/chebfun/blob/34f92d12ca51003f5c0033bbeb4ff57ac9c84e78/legpts.m
 !maybe a better choice https://github.com/Pazus/Legendre-Gauss-Quadrature/blob/master/legzo.m

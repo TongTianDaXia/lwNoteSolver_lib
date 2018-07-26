@@ -2,6 +2,8 @@ module polynomial_
 use constants
 use arrayOpsLib
 use SpecialFunctionLib
+use polyAlgorithmLib
+use IntegrationLib
 implicit none
     
     private
@@ -15,7 +17,11 @@ implicit none
     public:: zeroPolynomial
     !--
     public:: multiPolynominal
-    !--Legendre, use recursive method rather than explict expression to avoid failure of large n for binomialCoef/factorial method
+    !--based on the recursive definition P_{i+1} = (x-alpha_i)*P_i - beta_i*P_{i-1}
+    public:: orthnormalPolynomial
+    public:: orthnormalPolynomialSet
+    !--Legendre, use recursive method rather than explict expression to 
+    !   avoid failure due to large n for binomialCoef/factorial method
     public:: LegendrePolynomial
     public:: LegendrePolynomialSet
     public:: normalLegendrePolynomial
@@ -59,7 +65,7 @@ implicit none
         !--
         generic::           assignment(=)   => paEq
         generic::           operator(+)     => psPlus,spPlus,ppPlus
-        generic::           operator(-)     => ppMinus,negativePoly
+        generic::           operator(-)     => ppMinus,spMinus,psMinus,negativePoly
         generic::           operator(*)     => ppMultiply,spmultiply,psMultiply
         generic::           operator(/)     => psDivide
         generic::           operator(==)    => ppjdEq
@@ -71,6 +77,8 @@ implicit none
         procedure,pass(lhs),private::   ppPlus
         procedure,pass(rhs),private::   negativePoly
         procedure,pass(lhs),private::   ppMinus
+        procedure,pass(lhs),private::   psMinus
+        procedure,pass(rhs),private::   spMinus
         procedure,pass(lhs),private::   ppMultiply
         procedure,pass(lhs),private::   psMultiply
         procedure,pass(rhs),private::   spMultiply
@@ -339,6 +347,18 @@ contains
         p = lhs + (-rhs)
     end function ppMinus
     !--
+    elemental type(polynomial) function psMinus(lhs,rhs) result(p)
+    class(polynomial),intent(in)::      lhs
+    real(rp),intent(in)::               rhs
+        p = lhs + (-rhs)
+    end function psMinus
+    !--
+    elemental type(polynomial) function spMinus(lhs,rhs) result(p)
+    real(rp),intent(in)::               lhs
+    class(polynomial),intent(in)::      rhs
+        p = lhs + (-rhs)
+    end function spMinus
+    !--
     elemental type(polynomial) function ppMultiply(lhs,rhs) result(p)
     class(polynomial),intent(in)::      lhs
     type(polynomial),intent(in)::       rhs
@@ -409,6 +429,64 @@ contains
         allocate(z%coef_(0:0)); z%coef_ = zero
     end function zeroPolynomial
     
+    
+    !--alpha(0:n-1),beta(0:n-1):-> generate poly(n)
+    !!--based on the recursive definition P_{i+1} = (x-alpha_i)*P_i - beta_i*P_{i-1}
+    pure type(polynomial) function orthnormalPolynomial(alpha,beta) result(poly)
+    real(rp),dimension(0:),intent(in)::         alpha,beta
+    type(polynomial)::                          x,tmp1,tmp2
+    integer(ip)::                               i,n
+    real(rp),dimension(size(alpha))::           qx,qw
+    real(rp)::                                  normalizer
+    
+        n = size(alpha)
+        
+        x = [0._rp,1._rp]
+        poly = [1._rp]
+        poly = (x - alpha(0))*poly
+        if(n==1) return
+        
+        tmp2 = [1._rp]
+        do i=2,n
+            tmp1 = poly
+            poly = (x-alpha(i-1))*tmp1 - beta(i-1)*tmp2
+            tmp2 = tmp1
+        enddo
+        
+        call GaussCev(alpha,beta,qx,qw)
+        
+        normalizer = sum(poly%funcval(qx)**2 * qw)
+        poly = poly/normalizer
+    
+    end function orthnormalPolynomial
+    !--
+    pure function orthnormalPolynomialSet(alpha,beta) result(poly)
+    real(rp),dimension(0:),intent(in)::         alpha,beta
+    type(polynomial),dimension(0:size(alpha)):: poly
+    type(polynomial)::                          x
+    integer(ip)::                               i,n
+    real(rp),dimension(size(alpha))::           qx,qw
+    real(rp)::                                  normalizer
+    
+        n = size(alpha)
+        
+        x = [0._rp,1._rp]
+        poly(0) = [1._rp]        
+        poly(1) = (x - alpha(0))*poly(0)
+        if(n==1) return
+        
+        do i=2,n
+            poly(i) = (x-alpha(i-1))*poly(i-1) - beta(i-1)*poly(i-2)
+        enddo
+        
+        call GaussCev(alpha,beta,qx,qw)
+        
+        do i=0,n
+            normalizer = sum(poly(i)%funcval(qx)**2 * qw)
+            poly(i) = poly(i)/normalizer
+        enddo
+    
+    end function orthnormalPolynomialSet
     
     
     !---------------------
