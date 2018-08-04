@@ -771,12 +771,12 @@ contains
     pure real(rp) function multiPolynominal_polyval(sPolynomial,alpha,x) result(val)
     type(polynomial),dimension(0:),intent(in)::         sPolynomial
     integer(ip),dimension(:),intent(in)::               alpha
-    real(rp),intent(in)::                               x
+    real(rp),dimension(:),intent(in)::                  x
     integer(ip)::                                       i
         
         val = 1._rp
         do i=size(alpha),1,-1   !high order lead to small value
-            val = val * sPolynomial(alpha(i))%funcval(x)
+            val = val * sPolynomial(alpha(i))%funcval(x(i))
         end do
         
     end function multiPolynominal_polyval
@@ -784,12 +784,12 @@ contains
     pure real(rp) function multiPolynominal_heterPolyval(sPolynomial,alpha,x) result(val)
     type(polynomial),dimension(0:,:),intent(in)::       sPolynomial
     integer(ip),dimension(:),intent(in)::               alpha
-    real(rp),intent(in)::                               x
+    real(rp),dimension(:),intent(in)::                  x
     integer(ip)::                                       i
         
         val = 1._rp
         do i=size(alpha),1,-1   !high order lead to small value
-            val = val * sPolynomial(alpha(i),i)%funcval(x)
+            val = val * sPolynomial(alpha(i),i)%funcval(x(i))
         end do
         
     end function multiPolynominal_heterPolyval

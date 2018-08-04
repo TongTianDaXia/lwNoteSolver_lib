@@ -128,7 +128,7 @@ contains
             call this%init(p,d) !can't put this%p_, init first let p=minip
             this%i_ = i
         end if
-        call compositionNext(p,d,alpha,this%more,this%h,this%t)
+        call compositionNext(this%i_,d,alpha,this%more,this%h,this%t)
         more = this%more
         if(.not.more) call this%init(p,d)
         
@@ -138,8 +138,18 @@ contains
     pure integer(ip) function idxdim_Anova(this,i) result(d)
     class(multiAnovaIndex),intent(in)::     this
     integer(ip),intent(in)::                i
-        d = merge(1_ip, nint(binomialCoef(this%p_+this%vardim_,this%p_)) &
-                        - nint(binomialCoef(i+d-1,i-1)), i==0)
+    integer(ip)::                           j,p
+        p = this%p_
+        if(i==0) then
+            d = 1_ip
+        elseif(p<i) then
+            d = 0_ip
+        else
+            d = 0_ip
+            do j=0, p-i
+                d = d + nint(BinomialCoef(j+i-1, j)*BinomialCoef(this%vardim_, i))
+            enddo
+        endif
     end function idxdim_Anova
     
     !i is the number of correlated dimension
