@@ -138,15 +138,12 @@ contains
     pure integer(ip) function idxdim_Anova(this,i) result(d)
     class(multiAnovaIndex),intent(in)::     this
     integer(ip),intent(in)::                i
-    integer(ip)::                           j,p
-        p = this%p_
+    integer(ip)::                           j
         if(i==0) then
             d = 1_ip
-        elseif(p<i) then
-            d = 0_ip
         else
             d = 0_ip
-            do j=0, p-i
+            do j=0,this%p_-i
                 d = d + nint(BinomialCoef(j+i-1, j)*BinomialCoef(this%vardim_, i))
             enddo
         endif
