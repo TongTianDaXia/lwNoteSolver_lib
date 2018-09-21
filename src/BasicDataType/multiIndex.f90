@@ -113,7 +113,7 @@ contains
     pure integer(ip) function idxdim_tri(this,i) result(d)
     class(multiTriIndex),intent(in)::       this
     integer(ip),intent(in)::                i
-        d = nint(BinomialCoef(i+this%vardim_-1, i))
+        d = nint(combination(i+this%vardim_-1, i))
     end function idxdim_tri
     
     pure subroutine traverse_tri(this,i,alpha,more)
@@ -144,7 +144,7 @@ contains
         else
             d = 0_ip
             do j=0,this%p_-i
-                d = d + nint(BinomialCoef(j+i-1, j)*BinomialCoef(this%vardim_, i))
+                d = d + nint(combination(j+i-1, j)*combination(this%vardim_, i))
             enddo
         endif
     end function idxdim_Anova
@@ -173,7 +173,7 @@ contains
                 allocate(this%iv(i),this%a(i))
             end if
         
-            if(p<i) then    !due to tensor construction, don't consider the |i|>p
+            if(p<i) then        !due to tensor construction, don't consider the |i|>p
                 alpha(1) = -1
                 more = .false.
             elseif(p==i) then   !only combination is under consideration
@@ -234,7 +234,7 @@ contains
                 call combinationNext(this%vardim_, i, this%iv, this%combmore)
 
             !colex traverse [0,0] -> [p-1,p-1]
-            call colexNext(i, [(this%p_,j=1,i)], this%a, this%colxmore)
+            call colexNext(i, this%p_, this%a, this%colxmore)
             do j=1,i
                 alpha(this%iv(j)) = this%a(j) + 1
             enddo

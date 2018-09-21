@@ -24,11 +24,13 @@ implicit none
     !   avoid failure due to large n for binomialCoef/factorial method
     public:: LegendrePolynomial
     public:: LegendrePolynomialSet
+    !\int_{-1}^{1} p_n p_m dx = \delta_{nm} | tip: the weight function is 1 here
     public:: normalLegendrePolynomial
     public:: normalLegendrePolynomialSet
     !--Hermite, use recursive method rather than explict expression
     public:: HermitePolynomial
     public:: HermitePolynomialSet
+    !\int_{-\infty}^{\infty} p_n p_m e^{-x^2/2} dx = \delta_{nm}
     public:: normalHermitePolynomial
     public:: normalHermitePolynomialSet
     !--chebyshev
@@ -70,7 +72,7 @@ implicit none
         generic::           operator(/)     => psDivide
         generic::           operator(==)    => ppjdEq
         !a strange override
-        !https: //software.intel.com/en-us/forums/intel-visual-fortran-compiler-for-windows/topic/713637
+        !https://software.intel.com/en-us/forums/intel-visual-fortran-compiler-for-windows/topic/713637
         procedure,pass(lhs),private::   paEq
         procedure,pass(lhs),private::   psPlus
         procedure,pass(rhs),private::   spPlus
@@ -184,7 +186,7 @@ contains
     elemental type(polynomial) function contract(this) result(cp)
     class(polynomial),intent(in)::      this
     integer(ip)::                       i,n
-        n = ubound(this%coef_,dim=1)
+        n = ubound(this%coef_, 1)
         do i=n,1,-1
             if(this%coef_(i)==zero) then
                 n = n - 1
@@ -208,28 +210,23 @@ contains
     elemental real(rp) function integral(this,lo,up)
     class(polynomial),intent(in)::  this
     real(rp),intent(in)::           lo,up
-    real(rp)::                      ui,li,coef
-    integer(ip)::                   i
-        ui = zero; li = zero
-        do i=0,this%degree()
-            coef = this%coef(i) / dfloat(i+1)
-            ui = ui + up**(i+1) * coef
-            li = li + lo**(i+1) * coef
-        enddo
-        integral = ui - li  !less minus better
-    end function integral    
+    integer(ip)::                   i,d
+        d = this%degree()
+        integral = polyval([0._rp, this%coef()/[1:d+1]], up)
+        integral = integral - polyval([0._rp, this%coef()/[1:d+1]], lo)
+    end function integral
     
     !--
-    elemental type(polynomial) function differential(this) result(d)
+    elemental type(polynomial) function differential(this) result(dif)
     class(polynomial),intent(in)::  this
-    integer(ip)::                   i,n
-        n = this%degree()
-        if(n==0) then
-            d = [0._rp]
+    integer(ip)::                   i,d
+        d = this%degree()
+        if(d==0) then
+            dif = [0._rp]
         else
-            call d%init( n - 1 )
-            do i=0,n-1
-                d%coef_(i) = this%coef_(i+1) * real(i+1,kind=rp)
+            call dif%init(d-1)
+            do i=0,d-1
+                dif%coef_(i) = this%coef_(i+1) * real(i+1,kind=rp)
             enddo
         endif
     end function differential
@@ -301,7 +298,16 @@ contains
         
     end subroutine realRoot
     
-!--------operator
+    !---------
+    pure real(rp) function integratePolynomial(p,lo,up) result(r)
+    class(polynomial),intent(in)::  p
+    real(rp),intent(in)::           lo,up
+        r = p%integral(lo,up)
+    end function integratePolynomial
+    
+    !-----------------
+    !--------operator
+    !-----------------
     pure subroutine paEq(lhs,rhs)
     class(polynomial),intent(out)::     lhs
     real(rp),dimension(0:),intent(in):: rhs
@@ -412,18 +418,11 @@ contains
     end function ppjdeq
     
     
-    !-----------------------------------------------
-    pure real(rp) function integratePolynomial(p,lo,up) result(r)
-    class(polynomial),intent(in)::  p
-    real(rp),intent(in)::           lo,up
-        r = p%integral(lo,up)
-    end function integratePolynomial
     
-    
-    
-!------------------------------------------------------------------
-!specified polynomials
-    
+
+    !------------------------------------------------------------------
+    !specified polynomials
+    !------------------------------------------------------------------
     !---------------------
     elemental type(polynomial) function zeroPolynomial() result(z)
         allocate(z%coef_(0:0)); z%coef_ = zero
@@ -595,9 +594,9 @@ contains
     end function ChebyshevPolynomialTset
     
     
-!--compute sum_0^n(c*ChebPoly), sum = c(0)*T(0)%funcval(x)+......+c(n)*T(n)%funcval(x)
-!use Clenshaw algorithm, see wiki
-!https://github.com/chebfun/chebfun/blob/development/%40chebtech/clenshaw.m
+    !--compute sum_0^n(c*ChebPoly), sum = c(0)*T(0)%funcval(x)+......+c(n)*T(n)%funcval(x)
+    !use Clenshaw algorithm, see wiki
+    !https://github.com/chebfun/chebfun/blob/development/%40chebtech/clenshaw.m
     pure real(rp) function ChebyshevPolynomialT_Clenshaw(x,c) result(s)
     real(rp),intent(in)::               x
     real(rp),dimension(0:),intent(in):: c
@@ -681,7 +680,8 @@ contains
         enddo
     end function normalHermitePhysPolynomialSet
     
-     !---------------------
+    
+    !---------------------
     !H_n = x H_{n-1} - (n-1) H_{n-2}
     !for w(x) = e^{-x^2/2} | <Hi,Hi>=sqrt(2*pi) n!
     elemental type(polynomial) function HermiteProbPolynomial(n) result(poly)
@@ -743,7 +743,7 @@ contains
     end function normalHermiteProbPolynomialSet
     
     
-    !--
+    !------
     pure type(polynomial) function multiPolynominal_poly(sPolynomial,alpha) result(mp)
     type(polynomial),dimension(0:),intent(in)::         sPolynomial
     integer(ip),dimension(:),intent(in)::               alpha

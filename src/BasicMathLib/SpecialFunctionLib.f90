@@ -5,7 +5,7 @@ implicit none
 
     private
     public:: factorial
-    public:: binomialCoef
+    public:: binomialCoef, combination
     public:: besseljn_roots
     
     
@@ -15,7 +15,12 @@ implicit none
         procedure::  factorial_kn
     end interface factorial
 
-    !--
+    !--binomial coef is combinational number
+    interface combination
+        procedure::  BinomialCoef_int
+        procedure::  BinomialCoef_general
+    end interface combination
+    
     interface BinomialCoef
         procedure::  BinomialCoef_int
         procedure::  BinomialCoef_general

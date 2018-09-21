@@ -4,9 +4,9 @@ implicit none
 
     private
     public:: operator(.ip.),operator(.op.),operator(.cpv.),operator(.cps.)
-    public:: operator(-),operator(+),operator(*),operator(.eqvl.)
-    public:: magSqr, mag, angle, normal, para, orth, rot2, norm, polyval
-    public:: trace, diag, sort, cumprod, trans, repmat
+    public:: operator(-),operator(+),operator(*),operator(.eqv.),operator(.eqvs.)
+    public:: magSqr, mag, angle, normalize, para, orth, rot2, rot2deg, norm, polyval
+    public:: trace, diag, sort, cumprod, trans, repmat, bondcol, bondrow
     
     !indice ops
     public:: compositionNext,combinationNext,colexNext
@@ -50,11 +50,17 @@ implicit none
         procedure:: vmminus
     end interface
     
-    interface operator(.eqvl.)
-        procedure:: realiseq
-        procedure:: integeriseq
+    interface operator(.eqv.)
+        procedure:: eqv_r
+        procedure:: eqv_i
     end interface
     
+    interface operator(.eqvs.)
+        procedure:: eqvs
+    end interface
+    
+    
+    !---------------
     interface rot2
         procedure:: rot2Cs
         procedure:: rot2Theta
@@ -65,9 +71,11 @@ implicit none
         procedure:: diagExtractElement
     end interface diag
     
-    interface sort
-        procedure:: sortOneDimension
-        procedure:: sortTwoDimension
+    interface sort  !bubble sort
+        procedure:: sort1_i
+        procedure:: sort2_i
+        procedure:: sort1_r
+        procedure:: sort2_r
     end interface sort
     
     interface trans
@@ -83,9 +91,27 @@ implicit none
         procedure:: repmat_im
     end interface repmat
     
+    interface bondcol
+        procedure:: bondcol_vvr
+        procedure:: bondcol_vvvr
+    end interface bondcol
+    
+    interface bondrow
+        procedure:: bondrow_vvr
+        procedure:: bondrow_vvvr
+    end interface bondrow
+    
+    interface colexNext
+        procedure:: colexNext_isotropy
+        procedure:: colexNext_anisotropy
+    end interface colexNext
+    
+!-------------------------------------------------------
+    
 contains
 
 !-------------------------------------------------------
+
     pure real(rp) function mag(v)
     real(rp),dimension(:),intent(in)::  v
         mag = norm2(v)
@@ -101,16 +127,16 @@ contains
         angle = acos((v1.ip.v2)/mag(v1)/mag(v2))
     end function angle
     
-    pure function normal(v)
+    pure function normalize(v)
     real(rp),dimension(:),intent(in)::  v
-    real(rp),dimension(size(v))::       normal
-        normal = v / mag(v)
-    end function normal
+    real(rp),dimension(size(v))::       normalize
+        normalize = v / mag(v)
+    end function normalize
     
     pure function para(v1,v2)
     real(rp),dimension(:),intent(in)::  v1,v2
     real(rp),dimension(size(v1))::      para
-        para = (v1.ip.v2)*normal(v2)
+        para = (v1.ip.v2)*normalize(v2)
     end function para
     
     pure function orth(v1,v2)
@@ -120,20 +146,28 @@ contains
     end function orth
     
     !cs means cos and sin, v is the vector
-    pure function rot2Cs(cs,v) result(r)
+    pure function rot2Cs(v,cs) result(r)
     real(rp),dimension(2),intent(in)::  cs,v
     real(rp),dimension(2)::             r
         r(1) = cs(1)*v(1) - cs(2)*v(2)
         r(2) = cs(2)*v(1) + cs(1)*v(2)
     end function rot2Cs
     
-    pure function rot2Theta(theta,v) result(r)
-    real(rp),intent(in)::               theta
+    pure function rot2Theta(v,theta) result(r)
     real(rp),dimension(2),intent(in)::  v
+    real(rp),intent(in)::               theta
     real(rp),dimension(2)::             r
         r(1) = cos(theta)*v(1) - sin(theta)*v(2)
         r(2) = sin(theta)*v(1) + cos(theta)*v(2)
     end function rot2Theta
+    
+    pure function rot2deg(v,theta) result(r)
+    real(rp),dimension(2),intent(in)::  v
+    real(rp),intent(in)::               theta
+    real(rp),dimension(2)::             r
+        r(1) = cosd(theta)*v(1) - sind(theta)*v(2)
+        r(2) = sind(theta)*v(1) + cosd(theta)*v(2)
+    end function rot2deg
     
     
     !Lp norm
@@ -210,34 +244,88 @@ contains
         enddo
     end function trace
     
+    
     !---
-    pure subroutine sortOneDimension(array,location)
-    real(rp),dimension(:),intent(inout)::       array
-    integer(ip),dimension(:),intent(out)::      location
-    integer(ip)::                               i,k,n
-        n = size(array) 
-        do i=1,n
-            location(i) = i
-        end do
+    !bubble sort
+    !--
+    pure subroutine sort1_i(a,loca)
+    integer(ip),dimension(:),intent(inout)::a
+    integer(ip),dimension(:),&
+    intent(out),optional::                  loca
+    integer(ip)::                           i,k,n
+    logical(lp)::                           ex
+        n = size(a); ex = present(loca)
+        if(ex) then
+            do i=1,n
+                loca(i) = i
+            end do
+        endif
         do i=n-1,1,-1
             do k=1,i
-                if(array(k)>array(k+1)) then
-                    call swap(array(k),array(k+1))
-                    call swap(location(k),location(k+1))
+                if(a(k)>a(k+1)) then
+                    call swap(a(k), a(k+1))
+                    if(ex) call swap(loca(k), loca(k+1))
                 end if
             end do
         end do
-    end subroutine sortOneDimension
+    end subroutine sort1_i
     
     !--
-    pure subroutine sortTwoDimension(array,location)
-    real(rp),dimension(:,:),intent(inout)::     array
-    integer(ip),dimension(:,:),intent(out)::    location
+    pure subroutine sort2_i(a,loca)
+    integer(ip),dimension(:,:),intent(inout)::  a
+    integer(ip),dimension(:,:),&
+    intent(out),optional::                      loca
     integer(ip)::                               j
-        do j=1,size(array,dim=2)
-            call sort(array(:,j),location(:,j))
+        if(present(loca)) then
+            do j=1,size(a,dim=2)
+                call sort(a(:,j), loca(:,j))
+            end do
+        else
+            do j=1,size(a,dim=2)
+                call sort(a(:,j))
+            end do
+        endif
+    end subroutine sort2_i
+    
+    !---
+    pure subroutine sort1_r(a,loca)
+    real(rp),dimension(:),intent(inout)::   a
+    integer(ip),dimension(:),&
+    intent(out),optional::                  loca
+    integer(ip)::                           i,k,n
+    logical(lp)::                           ex
+        n = size(a); ex = present(loca)
+        if(ex) then
+            do i=1,n
+                loca(i) = i
+            end do
+        endif
+        do i=n-1,1,-1
+            do k=1,i
+                if(a(k)>a(k+1)) then
+                    call swap(a(k), a(k+1))
+                    if(ex) call swap(loca(k), loca(k+1))
+                end if
+            end do
         end do
-    end subroutine sortTwoDimension
+    end subroutine sort1_r
+    
+    !--
+    pure subroutine sort2_r(a,loca)
+    real(rp),dimension(:,:),intent(inout):: a
+    integer(ip),dimension(:,:),&
+    intent(out),optional::                  loca
+    integer(ip)::                           j
+        if(present(loca)) then
+            do j=1,size(a,dim=2)
+                call sort(a(:,j), loca(:,j))
+            end do
+        else
+            do j=1,size(a,dim=2)
+                call sort(a(:,j))
+            end do
+        endif
+    end subroutine sort2_r
     
     !-----
     pure function cumprod(x) 
@@ -264,8 +352,8 @@ contains
     end function trans_rvm
     !--
     pure function trans_rmm(m) result(mt)
-    real(rp),dimension(:,:),intent(in):: m
-    real(rp),dimension(size(m,2),size(m,1)):: mt
+    real(rp),dimension(:,:),intent(in)::    m
+    real(rp),dimension(size(m,2),size(m,1))::mt
         mt = transpose(m)
     end function trans_rmm
     
@@ -332,6 +420,38 @@ contains
         enddo
     end subroutine repmat_im
     
+    !--
+    pure function bondcol_vvr(a,b) result(r)
+    real(rp),dimension(:),intent(in)::      a,b
+    real(rp),dimension(:,:),allocatable::   r
+        allocate(r(max(size(a),size(b)),2))
+        r = 0._rp
+        r(:,1) = a
+        r(:,2) = b
+    end function bondcol_vvr
+    
+    pure function bondcol_vvvr(a,b,c) result(r)
+    real(rp),dimension(:),intent(in)::      a,b,c
+    real(rp),dimension(:,:),allocatable::   r
+        allocate(r(max(size(a),size(b),size(c)),3))
+        r = 0._rp
+        r(:,1) = a
+        r(:,2) = b
+        r(:,2) = c
+    end function bondcol_vvvr
+    
+    !--
+    pure function bondrow_vvr(a,b) result(r)
+    real(rp),dimension(:),intent(in)::      a,b
+    real(rp),dimension(:,:),allocatable::   r
+        allocate(r, source=trans(bondcol(a,b)))
+    end function bondrow_vvr
+    
+    pure function bondrow_vvvr(a,b,c) result(r)
+    real(rp),dimension(:),intent(in)::      a,b,c
+    real(rp),dimension(:,:),allocatable::   r
+        allocate(r, source=trans(bondcol(a,b,c)))
+    end function bondrow_vvvr
     
     !computes the compositions of the integer n into k parts | dim(a)=k; sum(a)=|a|=n
     !e.g. n=3, k=2: (3,0)(2,1)(1,2)(0,3) | totally 4 kinds, and this subroutine accomplish this order for next
@@ -364,7 +484,9 @@ contains
     end subroutine compositionNext
     
     !--
-    !dim(a)=k, maxval(a)=n | n>k
+    !select k element from n element without order | no order means one order by number
+    !dim(a)=k, maxval(a)<=n, no same element in a | n>k
+    !refer to http://people.sc.fsu.edu/~jburkardt/f_src/subset/subset.f90 |comb_next
     pure subroutine combinationNext(n,k,a,more)
     integer(ip),intent(in)::                n,k
     integer(ip),dimension(k),intent(inout)::a
@@ -402,19 +524,13 @@ contains
     !    (1,        0,        ...,0),
     !     ...
     !    (base(1)-1,0,        ...,0)
-    !
     !    (0,        1,        ...,0)
     !    (1,        1,        ...,0)
     !    ...
-    !    (base(1)-1,1,        ...,0)
-    !
-    !    (0,        2,        ...,0)
-    !    (1,        2,        ...,0)
-    !    ...
     !    (base(1)-1,base(2)-1,...,base(dim_num)-1).
-    !refer to http://people.sc.fsu.edu/~jburkardt/f_src/sandia_sparse/sandia_sparse.f90 %vec_colex_next2
-    pure subroutine colexNext(n,base,a,more)
-    integer(ip),intent(in)::                n
+    !refer to http://people.sc.fsu.edu/~jburkardt/f_src/subset/subset.f90 %vec_colex_next2
+    pure subroutine colexNext_anisotropy(k,base,a,more)
+    integer(ip),intent(in)::                k
     integer(ip),dimension(:),intent(in)::   base
     integer(ip),dimension(:),intent(inout)::a
     logical(lp),intent(inout)::             more
@@ -422,17 +538,43 @@ contains
         if(.not.more) then
             a = 0; more = .true.
         else
-            do i=1,n
+            do i=1,k
                 a(i) = a(i) + 1
-                do j=n,1,-1
-                    if(a(j)/=base(j)-1) exit
-                    if(j==1) more = .false.
-                enddo
+                if(a(1)==base(1)-1) then
+                    do j=k,1,-1
+                        if(a(j)/=base(j)-1) exit
+                        if(j==1) more = .false.
+                    enddo
+                endif
                 if(a(i)<base(i)) return
                 a(i) = 0
             enddo
         endif
-    end subroutine colexNext
+    end subroutine colexNext_anisotropy
+    
+    !refer to http://people.sc.fsu.edu/~jburkardt/f_src/subset/subset.f90 %vec_colex_next
+    pure subroutine colexNext_isotropy(k,base,a,more)
+    integer(ip),intent(in)::                k
+    integer(ip),intent(in)::                base
+    integer(ip),dimension(:),intent(inout)::a
+    logical(lp),intent(inout)::             more
+    integer(ip)::                           i,j
+        if(.not.more) then
+            a = 0; more = .true.
+        else
+            do i=1,k
+                a(i) = a(i) + 1
+                if(a(1)==base-1) then
+                    do j=k,1,-1
+                        if(a(j)/=base-1) exit
+                        if(j==1) more = .false.
+                    enddo
+                endif
+                if(a(i)<base) return
+                a(i) = 0
+            enddo
+        endif
+    end subroutine colexNext_isotropy
     
     
 !------------------------------------------------------------------
@@ -549,18 +691,33 @@ contains
         m = ( - rhs ) + lhs
     end function vmminus
 
+    
+    !equal operator
     !--
-    pure logical(lp) function realiseq(lhs,rhs) result(r)
-    real(rp),dimension(:),intent(in)::  lhs,rhs
+    pure logical(lp) function eqv_r(lhs,rhs) result(r)
+    real(rp),dimension(:),intent(in)::      lhs,rhs
         r = .false.
         if(size(lhs)==size(rhs)) r = all(lhs==rhs)
-    end function realiseq
+    end function eqv_r
     
     !--
-    pure logical(lp) function integeriseq(lhs,rhs) result(r)
-    integer(ip),dimension(:),intent(in)::lhs,rhs
+    pure logical(lp) function eqv_i(lhs,rhs) result(r)
+    integer(ip),dimension(:),intent(in)::   lhs,rhs
         r = .false.
         if(size(lhs)==size(rhs)) r = all(lhs==rhs)
-    end function integeriseq
+    end function eqv_i
+    
+    !--
+    pure logical(lp) function eqvs(lhs,rhs) result(r)
+    integer(ip),dimension(:),intent(in)::   lhs,rhs
+    integer(ip),dimension(size(lhs))::      sl,sr
+        r = .false.
+        if(size(lhs)==size(rhs)) then
+            sl = lhs; sr = rhs
+            call sort(sl)
+            call sort(sr)
+            r = all(sl==sr)
+        endif
+    end function eqvs
     
 end module arrayOpsLib

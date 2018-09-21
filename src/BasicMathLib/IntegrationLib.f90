@@ -1263,7 +1263,7 @@ contains
                     call TensorGridScaleClose(dim,maxlvl,lvl_d, giTensor)
                     
                     !--
-                    coef = merge(1._rp,-1._rp,ibits(maxlvl-ilvl,0,1)==0) * binomialCoef(dim-1,maxlvl-ilvl)
+                    coef = merge(1._rp,-1._rp,ibits(maxlvl-ilvl,0,1)==0) * combination(dim-1,maxlvl-ilvl)
                     do j=1,npTensor
                         do i=1,npSg
                             if(all(giTensor(:,j)==gi(:,i))) w(i) = w(i) + coef*gw(j)
@@ -1307,7 +1307,7 @@ contains
                     allocate(giTensor(dim,npTensor), gx(dim,npTensor), gw(npTensor), glvl(npTensor))
                     
                     call TensorWeight(dim,np_d,rule, gw,gx)
-                    coef = merge(1._rp,-1._rp,ibits(maxlvl-ilvl,0,1)==0) * binomialCoef(dim-1,maxlvl-ilvl)
+                    coef = merge(1._rp,-1._rp,ibits(maxlvl-ilvl,0,1)==0) * combination(dim-1,maxlvl-ilvl)
                     
                     !index from(-M,M); M = (np_d(d)-1)/2
                     call TensorGridIndexOwn(dim,np_d, giTensor)
