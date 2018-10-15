@@ -403,7 +403,7 @@ contains
             case(0)
                 exit
             case(1)
-                call csrAx(a,ia,ja , tmp(ipar(22):ipar(22)+nm1) , tmp(ipar(23):ipar(23)+nm1))
+                call csrAx(a,ia,ja, tmp(ipar(22):ipar(22)+nm1), tmp(ipar(23):ipar(23)+nm1))
             case(2) !stopping test
                 stop 'error: laWrapperLib/fgmresILUT has no user-defined stopping test, ipar(10)=0'
             case(3)
@@ -412,7 +412,7 @@ contains
             case(4)
                 if(dpar(7)<1.e-12_8) exit   !norm of generated vector
             case default
-                print*, 'fgmres request:  ',rciRequest
+                print*, 'fgmres request:  ', rciRequest
                 stop 'error: laWrapperLib/fgmresILUT fails'
             end select
         enddo
@@ -472,7 +472,7 @@ contains
             case(0)
                 exit
             case(1)
-                call csrAx(a,ia,ja , tmp(ipar(22):ipar(22)+nm1) , tmp(ipar(23):ipar(23)+nm1))
+                call csrAx(a,ia,ja, tmp(ipar(22):ipar(22)+nm1), tmp(ipar(23):ipar(23)+nm1))
             case(2) !stopping test
                 stop 'error: laWrapperLib/fgmres has no user-defined stopping test, ipar(10)=0'
             case(3)

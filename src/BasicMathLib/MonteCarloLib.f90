@@ -160,7 +160,8 @@ contains
             
             !see http://mathworld.wolfram.com/SampleVarianceDistribution.html
             !and http://mathworld.wolfram.com/Kurtosis.html
-            kurt(l1) = (sums(4) - 4*sums(3)*sums(1) + 6*sums(2)*sums(1)**2 - 3*sums(1)**4)/(sums(2)-sums(1)**2)**2
+            kurt(l1) = (sums(4) - 4*sums(3)*sums(1) + 6*sums(2)*sums(1)**2 &
+                        - 3*sums(1)**4)/(sums(2)-sums(1)**2)**2
             
             del1(l1) = sums(1)
             del2(l1) = sums(5)
@@ -172,7 +173,8 @@ contains
                 check(l1) = 0._rp
             else
                 !see section 3.2
-                check(l1) = abs(del1(l1)+del2(l)-del2(l1)) / (3*(sqrt(var1(l1)) + sqrt(var2(l)) + sqrt(var2(l+1))))
+                check(l1) = abs(del1(l1)+del2(l)-del2(l1))&
+                            /(3*(sqrt(var1(l1)) + sqrt(var2(l)) + sqrt(var2(l+1))))
                 check(l1) = check(l1) / sqrt(real(N,kind=rp))
             endif
             
@@ -204,21 +206,11 @@ contains
         
         maxl = 0
         do i=1,size(EpsAr)
-        
             eps = epsAr(i)
-            
             gamma = log2(cf)
-        
             call geoMultiLevelMonteCarlo(fn,maxlvl,eps,dn0,alpha,beta,gamma,ef,nl,lvlc)
-            
             maxl = max(lvlc-1, maxl)
-            
-            
         enddo
-    
-        
-        
-        
     
     end subroutine geoMultiLevelMonteCarloTest
     

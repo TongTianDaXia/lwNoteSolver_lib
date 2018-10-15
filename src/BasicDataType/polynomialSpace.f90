@@ -2,7 +2,7 @@
 !a function space with different measures has different optimal basis
 !it is a space due to the commutative operation (+ and *) and the measurement induced by inner product
 !the operational object is the coordinates of truncated basis expressed as an array
-module AskeyPolynomialSpace_
+module polynomialSpace_
 use constants
 use stringOpsLib
 use IntegrationLib
@@ -11,7 +11,7 @@ use polynomial_
 implicit none
 
     private
-    public:: AskeyPolynomialSpace
+    public:: polynomialSpace
     
     !--
     character(10),dimension(6),parameter:: polyType = ['legendre','hermite',    &
@@ -20,7 +20,7 @@ implicit none
 !----------------------------------
     !due to the normal-orthogonal polynomial basis, assert: basis(0) = 1 => phi(0) = mean(phi)
     !details see my TexNotes/UQ/fragment/method
-    type:: AskeyPolynomialSpace
+    type:: polynomialSpace
     
         private
         
@@ -78,12 +78,12 @@ implicit none
         procedure::             quadNp
         procedure::             quadx
     
-    end type AskeyPolynomialSpace
+    end type polynomialSpace
     
 contains
 
     subroutine init(this,basisType,basis,np)
-    class(AskeyPolynomialSpace),intent(out)::   this
+    class(polynomialSpace),intent(out)::   this
     character(*),intent(in)::                   basisType
     type(polynomial),dimension(0:),intent(in):: basis
     integer(ip),optional,intent(in)::           np
@@ -126,17 +126,17 @@ contains
                 if(t == polyType(i)) exit
             end do
             if(i==size(polyType)+1) &
-            stop 'error: AskeyPolynomialSpace get an unrecognized type'
+            stop 'error: polynomialSpace get an unrecognized type'
             
             if(truncOrder < 0) &
-            stop 'error: AskeyPolynomialSpace get a negative order'
+            stop 'error: polynomialSpace get a negative order'
         end subroutine check
         
     end subroutine init
     
     !--
     subroutine makeOpsCoef(this,basis,quadType,quadNp,ipMeasCoef)
-    class(AskeyPolynomialSpace),intent(inout)::     this
+    class(polynomialSpace),intent(inout)::     this
     type(polynomial),dimension(0:),intent(in)::     basis
     character(*),intent(in)::                       quadType
     integer(ip),intent(in)::                        quadNp
@@ -184,7 +184,7 @@ contains
     
     !return the value at the quad point based on the coefficients[a]
     pure real(rp) function quadVal(this,a,quadi)
-    class(AskeyPolynomialSpace),intent(in)::    this
+    class(polynomialSpace),intent(in)::    this
     real(rp),dimension(0:),intent(in)::         a
     integer(ip),intent(in)::                    quadi
         quadVal = sum(a*this%quadxBasis_(:,quadi))
@@ -193,14 +193,14 @@ contains
     
     !--
     pure real(rp) function project_func1(this,f1,ibasis) result(c)
-    class(AskeyPolynomialSpace),intent(in)::    this
+    class(polynomialSpace),intent(in)::    this
     procedure(absf1)::                          f1
     integer(ip),intent(in)::                    ibasis
         c = this%ipMeasCoef_ * sum(f1(this%quadx_) * this%quadxBasis_(ibasis,:) * this%quadw_)
     end function project_func1
     
     elemental real(rp) function project_poly(this,polyfunc,ibasis) result(c)
-    class(AskeyPolynomialSpace),intent(in)::    this
+    class(polynomialSpace),intent(in)::    this
     type(polynomial),intent(in)::               polyfunc
     integer(ip),intent(in)::                    ibasis
         c = this%project(pv,ibasis)
@@ -213,7 +213,7 @@ contains
     
 !------------------------------------------
     pure function mt(this,lhs,rhs)
-    class(AskeyPolynomialSpace),intent(in)::this
+    class(polynomialSpace),intent(in)::this
     real(rp),dimension(0:),intent(in)::     lhs,rhs
     real(rp),dimension(0:ubound(lhs,1))::   mt
     integer(ip)::                           i,j,k
@@ -229,7 +229,7 @@ contains
     
     !--
     pure function dv(this,up,down)
-    class(AskeyPolynomialSpace),intent(in)::this
+    class(polynomialSpace),intent(in)::this
     real(rp),dimension(0:),intent(in)::     up,down
     real(rp),dimension(0:ubound(down,1))::  dv
     real(rp),dimension(0:ubound(down,1),0:ubound(down,1)):: mat
@@ -246,7 +246,7 @@ contains
     !--if let func = df/du = df/du(u), it can be used to construct the derivative
     !--df^i/du_j = this%deri(this%op(a,df/du)) where u = \sum a_i \phi_i
     pure function op(this,a,func) result(o)
-    class(AskeyPolynomialSpace),intent(in)::this
+    class(polynomialSpace),intent(in)::this
     real(rp),dimension(0:),intent(in)::     a
     procedure(absf1)::                      func
     real(rp),dimension(0:ubound(a,1))::     o
@@ -264,7 +264,7 @@ contains
     
     !--
     pure function sqt(this,a) result(o)
-    class(AskeyPolynomialSpace),intent(in)::this
+    class(polynomialSpace),intent(in)::this
     real(rp),dimension(0:),intent(in)::     a
     real(rp),dimension(0:ubound(a,1))::     o
         !solve \int \sqrt(\sum_{k=0}^{n} u_k*\psi_k) \psi_i \pi dx
@@ -278,7 +278,7 @@ contains
     
     !--
     pure function pw(this,a,s) result(o)
-    class(AskeyPolynomialSpace),intent(in)::this
+    class(polynomialSpace),intent(in)::this
     real(rp),dimension(0:),intent(in)::     a
     real(rp),intent(in)::                   s
     real(rp),dimension(0:ubound(a,1))::     o
@@ -293,7 +293,7 @@ contains
     
     !--
     pure function ex(this,a) result(o)
-    class(AskeyPolynomialSpace),intent(in)::this
+    class(polynomialSpace),intent(in)::this
     real(rp),dimension(0:),intent(in)::     a
     real(rp),dimension(0:ubound(a,1))::     o
         !solve \int e^(\sum_{k=0}^{n} c_k*\psi_k) \psi_i \pi dx
@@ -307,7 +307,7 @@ contains
     
     !--
     pure function ln(this,a) result(o)
-    class(AskeyPolynomialSpace),intent(in)::this
+    class(polynomialSpace),intent(in)::this
     real(rp),dimension(0:),intent(in)::     a
     real(rp),dimension(0:ubound(a,1))::     o
         !solve \int log(\sum_{k=0}^{n} c_k*\psi_k) \psi_i \pi dx
@@ -321,7 +321,7 @@ contains
     
     !--
     pure function dc(this,a,lowerfunc,upperfunc,dispt) result(o)
-    class(AskeyPolynomialSpace),intent(in)::this
+    class(polynomialSpace),intent(in)::this
     real(rp),dimension(0:),intent(in)::     a
     procedure(absf1)::                      lowerfunc,upperfunc
     real(rp),intent(in)::                   dispt
@@ -344,7 +344,7 @@ contains
     !df/du = \sum a_k \phi_k, df^i/du_j = \sum a_k <\phi_i \phi_j \phi_k>
     !for example | df^i/du_j = this%deri(this%op(a_u,df/du)) where u = \sum a_{ui} \phi_i
     pure function deri(this,a_dfdu)
-    class(AskeyPolynomialSpace),intent(in)::this
+    class(polynomialSpace),intent(in)::this
     real(rp),dimension(0:),intent(in)::     a_dfdu
     real(rp),dimension(0:ubound(a_dfdu,1),0:ubound(a_dfdu,1)):: deri
     integer(ip)::                           i,j
@@ -358,7 +358,7 @@ contains
     !if we only concern the df^i = matmul(df^i/du_j,du_j), it is not necessary to compute df^i/du_j
     !the df/du = \sum a_i \phi_i is enough
     pure function diff(this,a_dfdu,a_du)
-    class(AskeyPolynomialSpace),intent(in)::this
+    class(polynomialSpace),intent(in)::this
     real(rp),dimension(0:),intent(in)::     a_dfdu,a_du
     real(rp),dimension(0:ubound(a_dfdu,1))::diff
     integer(ip)::                           i,j
@@ -372,19 +372,19 @@ contains
     
 !----------------------------
     pure integer(ip) function truncOd(this)
-    class(AskeyPolynomialSpace),intent(in)::this
+    class(polynomialSpace),intent(in)::this
         truncOd = this%truncOd_
     end function truncOd
     
     pure integer(ip) function quadNp(this)
-    class(AskeyPolynomialSpace),intent(in)::this
+    class(polynomialSpace),intent(in)::this
         quadNp = this%quadNp_
     end function quadNp
     
     pure real(rp) function quadx(this,i)
-    class(AskeyPolynomialSpace),intent(in)::this
+    class(polynomialSpace),intent(in)::this
     integer(ip),intent(in)::                i
         quadx = this%quadx_(i)
     end function quadx
     
-end module AskeyPolynomialSpace_
+end module polynomialSpace_

@@ -194,13 +194,13 @@ contains
     real(rp),intent(in)::               x
     integer(ip)::                       i
         polyval = 0._rp
-        if(abs(x)>1._rp) then
-            do i=0,ubound(a,1)
-                polyval = polyval + a(i) * x**i 
+        if(abs(x)<1._rp) then
+            do i=ubound(a,1),0,-1
+                polyval = polyval + a(i)*x**i
             enddo
         else
-            do i=ubound(a,1),0,-1
-                polyval = polyval + a(i) * x**i 
+            do i=0,ubound(a,1)
+                polyval = polyval + a(i)*x**i
             enddo
         endif
     end function polyval

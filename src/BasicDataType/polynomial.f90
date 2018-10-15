@@ -2,7 +2,7 @@ module polynomial_
 use constants
 use arrayOpsLib
 use SpecialFunctionLib
-use polyAlgorithmLib
+use polynomialLib
 use IntegrationLib
 implicit none
     
@@ -17,26 +17,36 @@ implicit none
     public:: zeroPolynomial
     !--
     public:: multiPolynominal
+    
     !--based on the recursive definition P_{i+1} = (x-alpha_i)*P_i - beta_i*P_{i-1}
     public:: orthnormalPolynomial
     public:: orthnormalPolynomialSet
+    
     !--Legendre, use recursive method rather than explict expression to 
     !   avoid failure due to large n for binomialCoef/factorial method
     public:: LegendrePolynomial
     public:: LegendrePolynomialSet
+    !the following polynomial is normalized for 
     !\int_{-1}^{1} p_n p_m dx = \delta_{nm} | tip: the weight function is 1 here
+    !for probability density, the density function is {1/2}
     public:: normalLegendrePolynomial
     public:: normalLegendrePolynomialSet
+    
     !--Hermite, use recursive method rather than explict expression
     public:: HermitePolynomial
     public:: HermitePolynomialSet
+    !the following polynomial is normalized for 
     !\int_{-\infty}^{\infty} p_n p_m e^{-x^2/2} dx = \delta_{nm}
+    !for probability density, the density function is {1/sqrt(2\pi)e^{-x^2/2}}
     public:: normalHermitePolynomial
     public:: normalHermitePolynomialSet
+    
     !--chebyshev
     public:: ChebyshevPolynomialT
     public:: ChebyshevPolynomialTset
     public:: ChebyshevPolynomialT_Clenshaw
+    
+    !--------------------------------------------------------------
     !--
     type:: polynomial
     
@@ -212,8 +222,8 @@ contains
     real(rp),intent(in)::           lo,up
     integer(ip)::                   i,d
         d = this%degree()
-        integral = polyval([0._rp, this%coef()/[1:d+1]], up)
-        integral = integral - polyval([0._rp, this%coef()/[1:d+1]], lo)
+        integral = polyval([0._rp, this%coef_(0:d)/[1:d+1]], up)
+        integral = integral - polyval([0._rp, this%coef_(0:d)/[1:d+1]], lo)
     end function integral
     
     !--
@@ -551,7 +561,7 @@ contains
     end function normalLegendrePolynomialSet
     
 
-!wiki(chebyshev polynomial) T(n) for first kind and U(n) for second kind
+    !wiki(chebyshev polynomial) T(n) for first kind and U(n) for second kind
     elemental type(polynomial) function ChebyshevPolynomialT(n) result(poly)
     integer(ip),intent(in)::            n
     type(polynomial)::                  tm2,tm1,x

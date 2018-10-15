@@ -1,5 +1,5 @@
 !some algorithm for special polynomial construction
-module polyAlgorithmLib
+module polynomialLib
 use constants
 use arrayOpsLib
 implicit none
@@ -119,4 +119,4 @@ contains
     
     
 
-end module polyAlgorithmLib
+end module polynomialLib
