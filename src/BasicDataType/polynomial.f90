@@ -35,8 +35,8 @@ implicit none
     !--Hermite, use recursive method rather than explict expression
     public:: HermitePolynomial
     public:: HermitePolynomialSet
-    !the following polynomial is normalized for 
-    !\int_{-\infty}^{\infty} p_n p_m e^{-x^2/2} dx = \delta_{nm}
+    !the following polynomial is normalized for
+    !\int_{-\infty}^{\infty} p_n p_m e^{-x^2} dx = \delta_{nm}
     !for probability density, the density function is {1/sqrt(2\pi)e^{-x^2/2}}
     public:: normalHermitePolynomial
     public:: normalHermitePolynomialSet
@@ -99,27 +99,11 @@ implicit none
 
     end type polynomial
 
-!---------------------------------------------------------------------
+    !---------------------------------------------------------------------
     interface integrate
         procedure:: integratePolynomial
-    end interface integrate   
-    !---------------------------
-    interface HermitePolynomial
-        procedure:: HermiteProbPolynomial
-    end interface HermitePolynomial
-    !---------------------------
-    interface HermitePolynomialSet
-        procedure:: HermiteProbPolynomialSet
-    end interface HermitePolynomialSet
-    !---------------------------
-    interface normalHermitePolynomial
-        procedure:: normalHermiteProbPolynomial
-    end interface normalHermitePolynomial
-    !---------------------------
-    interface normalHermitePolynomialSet
-        procedure:: normalHermiteProbPolynomialSet
-    end interface normalHermitePolynomialSet
-    !---------------------------
+    end interface integrate
+    !----
     interface multiPolynominal
         procedure:: multiPolynominal_Poly
         procedure:: multiPolynominal_Polyval
@@ -153,8 +137,7 @@ contains
         allocate(this%coef_,source = that%coef_)
     end subroutine init_ply
 
-    
-    !---
+    !--
     function coef_ptr(this)
     class(polynomial),target,intent(in)::this
     real(rp),dimension(:),pointer::     coef_ptr
@@ -603,7 +586,6 @@ contains
         endif
     end function ChebyshevPolynomialTset
     
-    
     !--compute sum_0^n(c*ChebPoly), sum = c(0)*T(0)%funcval(x)+......+c(n)*T(n)%funcval(x)
     !use Clenshaw algorithm, see wiki
     !https://github.com/chebfun/chebfun/blob/development/%40chebtech/clenshaw.m
@@ -645,7 +627,7 @@ contains
             tm2 = [1._rp]
             tm1 = 2._rp*x
             do i = 2 , n
-                poly = 2._rp* x * tm1 - 2._rp*(i - 1._rp) * tm2
+                poly = 2._rp*x*tm1 - 2._rp*(i - 1._rp)*tm2
                 tm2 = tm1
                 tm1 = poly
             enddo
@@ -668,7 +650,7 @@ contains
             poly(0) = [1._rp]
             poly(1) = [0._rp,2._rp]
             do i = 2 , n
-                poly(i) = 2._rp* x * poly(i-1) - 2._rp*(i - 1._rp) * poly(i-2)
+                poly(i) = 2._rp*x*poly(i-1) - 2._rp*(i - 1._rp)*poly(i-2)
             enddo
         endif
     end function HermitePhysPolynomialSet
@@ -676,7 +658,7 @@ contains
     !--
     elemental type(polynomial) function normalHermitePhysPolynomial(n) result(poly)
     integer(ip),intent(in)::                n
-        poly = (1._rp / sqrt( spi * 2**n * factorial(n))) * HermitePhysPolynomial(n)
+        poly = (1._rp/sqrt(spi*2**n*factorial(n)))*HermitePhysPolynomial(n)
     end function normalHermitePhysPolynomial
     
     !--
@@ -686,7 +668,7 @@ contains
     integer(ip)::                           i
         poly = HermitePhysPolynomialSet(n)
         do i=0,n
-            poly(i) = (1._rp / sqrt( spi * 2**n * factorial(n))) * poly(i)
+            poly(i) = (1._rp/sqrt(spi*2**i*factorial(i)))*poly(i)
         enddo
     end function normalHermitePhysPolynomialSet
     
@@ -730,7 +712,7 @@ contains
             poly(0) = [1._rp]
             poly(1) = [0._rp,1._rp]
             do i = 2 , n
-                poly(i) = x * poly(i-1) - (i - 1._rp) * poly(i-2)
+                poly(i) = x*poly(i-1) - (i - 1._rp)*poly(i-2)
             enddo
         endif
     end function HermiteProbPolynomialSet
@@ -738,7 +720,7 @@ contains
     !--
     elemental type(polynomial) function normalHermiteProbPolynomial(n) result(poly)
     integer(ip),intent(in)::                n
-        poly = (1._rp / sqrt(sqrt(2._rp) * spi * factorial(n))) * HermiteProbPolynomial(n)
+        poly = (1._rp/sqrt(sqrt(2._rp)*spi*factorial(n)))*HermiteProbPolynomial(n)
     end function normalHermiteProbPolynomial
     
     !--
@@ -748,12 +730,92 @@ contains
     integer(ip)::                           i
         poly = HermiteProbPolynomialSet(n)
         do i=0,n
-            poly(i) = (1._rp / sqrt(sqrt(2._rp) * spi * factorial(n))) * poly(i)
+            poly(i) = (1._rp/sqrt(sqrt(2._rp)*spi*factorial(i)))*poly(i)
         enddo
     end function normalHermiteProbPolynomialSet
     
     
-    !------
+    !------------------
+    elemental type(polynomial) function hermitePolynomial(n,var) result(p)
+    integer(ip),intent(in)::            n
+    character(*),optional,intent(in)::  var
+    
+        if(present(var)) then
+            if(var=='phys') then
+                p = HermitePhysPolynomial(n)
+            elseif(var=='prob') then
+                p = HermiteProbPolynomial(n)
+            else
+                call disableprogram
+            endif
+        else
+            p = HermitePhysPolynomial(n)
+        endif
+    
+    end function hermitePolynomial
+    
+    !--
+    pure function HermitePolynomialSet(n,var) result(p)
+    integer(ip),intent(in)::            n
+    character(*),optional,intent(in)::  var
+    type(polynomial),dimension(0:n)::   p
+    
+        if(present(var)) then
+            if(var=='phys') then
+                p = HermitePhysPolynomialSet(n)
+            elseif(var=='prob') then
+                p = HermiteProbPolynomialSet(n)
+            else
+                call disableprogram
+            endif
+        else
+            p = HermitePhysPolynomialSet(n)
+        endif
+    
+    end function HermitePolynomialSet
+    
+    !--
+    elemental type(polynomial) function normalHermitePolynomial(n,var) result(p)
+    integer(ip),intent(in)::            n
+    character(*),optional,intent(in)::  var
+    
+        if(present(var)) then
+            if(var=='phys') then
+                p = normalHermitePhysPolynomial(n)
+            elseif(var=='prob') then
+                p = normalHermiteProbPolynomial(n)
+            else
+                call disableprogram
+            endif
+        else
+            p = normalHermitePhysPolynomial(n)
+        endif
+    
+    end function normalHermitePolynomial
+    
+    !--
+    pure function normalHermitePolynomialSet(n,var) result(p)
+    integer(ip),intent(in)::            n
+    character(*),optional,intent(in)::  var
+    type(polynomial),dimension(0:n)::   p
+    
+        if(present(var)) then
+            if(var=='phys') then
+                p = normalHermitePhysPolynomialSet(n)
+            elseif(var=='prob') then
+                p = normalHermiteProbPolynomialSet(n)
+            else
+                call disableprogram
+            endif
+        else
+            p = normalHermitePhysPolynomialSet(n)
+        endif
+    
+    end function normalHermitePolynomialSet
+    
+    
+    
+    !--------------------------------------------------------------------------------
     pure type(polynomial) function multiPolynominal_poly(sPolynomial,alpha) result(mp)
     type(polynomial),dimension(0:),intent(in)::         sPolynomial
     integer(ip),dimension(:),intent(in)::               alpha

@@ -270,6 +270,8 @@ contains
             call GaussLegendre(quadx,quadw)
         case('gausshermite','gh','hermite')
             call GaussHermite(quadx,quadw)
+        case('gausshermite_prob','gh_prob','hermite_prob')
+            call GaussHermite(quadx,quadw,'prob')
         case('clenshawcurtis','cc')
             call ClenshawCurtis(quadx,quadw)
         case default
@@ -279,11 +281,11 @@ contains
     end subroutine quadratureRule
     
     
-!refer to https://github.com/chebfun/chebfun/blob/34f92d12ca51003f5c0033bbeb4ff57ac9c84e78/legpts.m
-!maybe a better choice https://github.com/Pazus/Legendre-Gauss-Quadrature/blob/master/legzo.m
-!calculate \[ \int_{-1}^{1} f(x) dx \],(refer to wiki, \pi(x)=1 rather than \pi(x)=\frac{1}{2})
-!asymptotic method unavailiable temporarily
-!n points reach 2n-1 order accuracy | N+1 points reach 2N+1 order accuracy
+    !refer to https://github.com/chebfun/chebfun/blob/34f92d12ca51003f5c0033bbeb4ff57ac9c84e78/legpts.m
+    !maybe a better choice https://github.com/Pazus/Legendre-Gauss-Quadrature/blob/master/legzo.m
+    !calculate \[ \int_{-1}^{1} f(x) dx \],(refer to wiki, \pi(x)=1 rather than \pi(x)=\frac{1}{2})
+    !asymptotic method unavailiable temporarily
+    !n points reach 2n-1 order accuracy | N+1 points reach 2N+1 order accuracy
     pure subroutine GaussLegendre(quadx,quadw)
     real(rp),dimension(:),intent(out)::         quadx,quadw
     integer(ip)::                               n
@@ -415,16 +417,18 @@ contains
         
     end subroutine GaussLegendre
     
-!------------------------------------------------------------------------------------
-!refer to https://github.com/chebfun/chebfun/blob/development/hermpts.m
-!calculate \[ \int_{-inf}^{inf}exp(-x^2)f(x) dx \],(refer to wiki)
-!hermite asymptotic method unavailiable temporarily
-!GaussHermite returns hermite points and gauss-hermite quadrature weights.
-!by default these are roots of the 'physicist'-type hermite polynomials, which are orthogonal with respect to the weight exp(-x.^2).
-!------------------------------------------------------------------------------------
-    pure subroutine GaussHermitePhys(quadx,quadw)
-    real(rp),dimension(:),intent(out)::                     quadx,quadw
-    integer(ip)::                                           n
+    !------------------------------------------------------------------------------------
+    !refer to https://github.com/chebfun/chebfun/blob/development/hermpts.m
+    !calculate \[ \int_{-inf}^{inf} f(x) exp(-x^2) dx \],(refer to wiki)
+    !hermite asymptotic method unavailiable temporarily
+    !GaussHermite returns hermite points and gauss-hermite quadrature weights.
+    !by default these are roots of the 'physicist'-type hermite polynomials, which are orthogonal with respect to the weight exp(-x.^2).\
+    !if(var=='prob'), it calculate \[ \int_{-inf}^{inf} f(x) exp(-x^2/2) dx \]
+    !------------------------------------------------------------------------------------
+    pure subroutine GaussHermitePhys(quadx,quadw,var)
+    real(rp),dimension(:),intent(out)::     quadx,quadw
+    character(*),intent(in),optional::      var
+    integer(ip)::                           n
     
         n=size(quadx)
         if(n==0) then
@@ -444,140 +448,52 @@ contains
         end if
         
         !Normalise so that sum(w) = spi
-        quadw = (spi/sum(quadw))*quadw     
+        quadw = (spi/sum(quadw))*quadw
+        
+        !--for probability weight exp(-x^2/2)
+        if(present(var)) then
+            if(var=='prob') then
+                quadx = quadx * sqrt(2._rp)
+                quadw = quadw * sqrt(2._rp)
+            else
+                call disableprogram
+            endif
+        endif
             
     contains
         
-        !--------------------------------------------------------------------------
+        !-------------------------------------------------------
         pure subroutine GlaserLiuRokhlinAlgorithm(n)
-        integer(ip),intent(in)::                                n
-        real(rp),dimension(n)::                                 ders
+        integer(ip),intent(in)::            n
+        real(rp),dimension(n)::             ders
         
             !'GLR' uses Glaser-Liu-Rokhlin fast algorithm which is much faster for large N
             call alg0_Herm(n,quadx,ders)
-            quadw = (2._rp*exp(-quadx**2)/ders**2)                  ! Quadrature weights
+            quadw = (2._rp*exp(-quadx**2)/ders**2)  ! Quadrature weights
             
         end subroutine GlaserLiuRokhlinAlgorithm
         
         !-------------------------------------------------------
         pure subroutine alg0_Herm(n,x,ders)
-        integer(ip),intent(in)::                                n
-        real(rp),dimension(:),intent(out)::                     x,ders    
+        integer(ip),intent(in)::            n
+        real(rp),dimension(:),intent(out):: x,ders
+        
             ! Compute coefficients of H_m(0), H_m'(0), m = 0,..,N
-            call first_root(n,x,ders)                           !find first root
-            call alg1_Herm(n,x,ders)                            !compute roots and derivatives
+            call first_root(n,x,ders)       !find first root
+            call alg1_Herm(n,x,ders)        !compute roots and derivatives
         
         end subroutine alg0_Herm
-        !-------------------------------------------------------
-        pure subroutine first_root(n,x,ders)
-        integer(ip),intent(in)::                                n
-        real(rp),dimension(:),intent(out)::                     x,ders
-        real(rp)::                                              Hm2, Hm1, Hpm2, Hpm1,H,Hp
-        integer(ip)::                                           k                    
         
-            Hm2 = 0._rp
-            Hm1 = pi**(-0.25_rp)
-            Hpm2 = 0._rp
-            Hpm1 = 0._rp
-            do k = 0,n-1
-                H = -sqrt(1._rp*k/(k+1))*Hm2
-                Hp = sqrt(2._rp/(k+1))*Hm1-sqrt(1._rp*k/(k+1))*Hpm2
-                Hm2 = Hm1
-                Hm1 = H
-                Hpm2 = Hpm1
-                Hpm1 = Hp
-            end do
-            x=0._rp
-            ders=0._rp
-            if (ibits(n,0,1)==1) then
-                !zero is a root:
-                x(ishft((n-1),-1)) = 0._rp                          !x((n-1)/2) = 0 
-                ders(ishft((n+1),-1)) = Hp                          !ders((n+1)/2) = Hp        
-            else
-                !find first root
-                call alg2_Herm(H,n,x(ishft(n,-1)+1),ders(ishft(n,-1)+1))
-            end if
-        
-        end subroutine first_root
-        !-------------------------------------------------------
-        pure subroutine alg2_Herm(H,n,x1,d1)
-        real(rp),intent(in)::                               H
-        integer(ip),intent(in)::                            n
-        real(rp),intent(out)::                              x1,d1
-        integer(ip)::                                       k,i,l
-        integer(ip),parameter::                             m = 30      !number of terms in Taylor expansion
-        real(rp)::                                          m1,c,step,dx,x0,x11,y0
-        real(rp),dimension(m)::                             z,z1,z2
-        real(rp),dimension(10)::                            x2
-        real(rp),dimension(m+1)::                           u,up,x1k
-            
-            ! find the first root (note H_n'(0) = 0)
-            ! advance ODE via Runge-Kutta for initial approx
-            !x1 = odeRK2(0._rp,-pi/2,0._rp,n)  
-            !   x1 = odeRK2(0._rp,-pi/2,0._rp,n)
-            !   odeRK2_TVD_1step(dydx,dx,x0,y0)
-            x0 = 0._rp
-            x11 = -pi/2._rp
-            y0 = 0._rp
-            dx = (x11 - x0) / 10._rp
-            x2 = odeRK2(dydx,dx,x0,y0,10)
-            x1 = x2(10)
-            !scaling
-            m1 = 1._rp/x1
-            !initialise
-            u = 0._rp
-            up = 0._rp
-            
-            !recurrence relation for Legendre polynomials
-            u(1) = H
-            u(3) = -0.5_rp*(2._rp*n+1)*u(1)/m1**2                       !attention
-            up(1) = 0._rp 
-            up(2) = 2._rp*u(3)*m1
-            do k = 2,m-2,2
-                u(k+3) = (-(2._rp*n+1)*u(k+1)/m1**2 + u(k-1)/m1**4)/((k+1)*(k+2))
-                up(k+2) = (k+2)*u(k+3)*m1
-            end do
-            
-            !flip for more accuracy in inner product calculation
-            u = [(u(i) ,i = m+1,1,-1)]
-            up =[(up(i),i = m+1,1,-1)]
-            z = 0._rp                                                  
-            z1 = m1*x1+z
-            z2 = cumprod(z1)                                          
-            x1k = [m1,(z2(i),i=1,m)]
-            step = maxrp                                                
-            l = 0
-            
-            !Newton iteration
-            do while ((abs(step)>GlobalEps).and.(l<10))
-                l = l + 1
-                step = (u.ip.x1k)/(up.ip.x1k)
-                x1 = x1 - step
-                !powers of h (This is the fastest way!)
-                z1 = m1*x1+z
-                z2 = cumprod(z1)
-                x1k = [1._rp,(z2(i),i=1,m)]
-                x1k = [(x1k(i),i=m+1,1,-1)]
-            end do
-            
-            !Update derivative
-            d1 = (up.ip.x1k)
-        end subroutine alg2_Herm
-        !-------------------------------------------------------
-        pure real(rp) function dydx(x0,y0) result(y)
-        real(rp),intent(in)::       x0,y0
-            y=-1._rp/(sqrt(2._rp*n+1-y0**2) - 0.5_rp*y0*sin(2._rp*x0)/(2._rp*n+1-y0**2))
-        end function dydx
         !-------------------------------------------------------
         pure subroutine alg1_Herm(n,roots,ders)
-        integer(ip),intent(in)::                            n
-        real(rp),dimension(:),intent(out)::                 roots,ders
-        integer(ip)::                                       s,N1,j,l,i,k
-        integer(ip),parameter::                             m = 30  !number of terms in Taylor expansion 
-        real(rp)::                                          x,h,m1,c1,c2,c3,step,x0,x1,x11,y0,dx 
-        real(rp),dimension(m)::                             z,z1,z2
-        real(rp),dimension(10)::                            x2
-        real(rp),dimension(m+1)::                           hh1,u,up,hh
+        integer(ip),intent(in)::            n
+        real(rp),dimension(:),intent(out):: roots,ders
+        integer(ip)::                       s,N1,j,l,i,k
+        integer(ip),parameter::             m = 30  !number of terms in Taylor expansion 
+        real(rp)::                          x,h,m1,c1,c2,c3,step,x0,x1,x11,y0,dx 
+        real(rp),dimension(m)::             z,z1,z2
+        real(rp),dimension(10)::            x2
+        real(rp),dimension(m+1)::           hh1,u,up,hh
         
             s=ibits(n,0,1)
             N1=ishft(n,-1)
@@ -586,9 +502,9 @@ contains
             u  = 0._rp
             up = 0._rp
         
-            do j =(N1+1),(n-1)
+            do j=N1+1,n-1
                 !previous root
-                x = roots(j) 
+                x = roots(j)
                 !initial approx
                 x0=  pi/2._rp
                 x11=-pi/2._rp
@@ -633,7 +549,7 @@ contains
                     z2 = cumprod(z1)
                     hh = [m1,(z2(i),i=1,m)]           
                     !flip for more accuracy in inner product calculation
-                    hh(1:m+1) = hh(m+1:1:-1)                
+                    hh(1:m+1) = hh(m+1:1:-1)
                 end do
                 roots(j+1) = x + h
                 !ders(j+1) =  dot_product(up,hh)
@@ -641,14 +557,119 @@ contains
             end do   
             !nodes are symmetric
             roots(1:N1+s) = -roots(n:N1+1:-1)
-            ders(1:N1+s) = ders(n:N1+1:-1)        
+            ders(1:N1+s) = ders(n:N1+1:-1)
+            
         end subroutine alg1_Herm
-        !-------------------------------------------------------------------------------------
+                
+        !-------------------------------------------------------
+        pure subroutine first_root(n,x,ders)
+        integer(ip),intent(in)::            n
+        real(rp),dimension(:),intent(out):: x,ders
+        real(rp)::                          Hm2, Hm1, Hpm2, Hpm1,H,Hp
+        integer(ip)::                       k                    
         
+            Hm2 = 0._rp
+            Hm1 = pi**(-0.25_rp)
+            Hpm2 = 0._rp
+            Hpm1 = 0._rp
+            do k = 0,n-1
+                H = -sqrt(1._rp*k/(k+1))*Hm2
+                Hp = sqrt(2._rp/(k+1))*Hm1 - sqrt(1._rp*k/(k+1))*Hpm2
+                Hm2 = Hm1
+                Hm1 = H
+                Hpm2 = Hpm1
+                Hpm1 = Hp
+            end do
+            x=0._rp
+            ders=0._rp
+            if (ibits(n,0,1)==1) then
+                !zero is a root:
+                x(ishft((n-1),-1)) = 0._rp  !x((n-1)/2) = 0 
+                ders(ishft((n+1),-1)) = Hp  !ders((n+1)/2) = Hp        
+            else
+                !find first root
+                call alg2_Herm(H,n,x(ishft(n,-1)+1),ders(ishft(n,-1)+1))
+            end if
+        
+        end subroutine first_root
+        
+        !-------------------------------------------------------
+        pure subroutine alg2_Herm(H,n,x1,d1)
+        real(rp),intent(in)::               H
+        integer(ip),intent(in)::            n
+        real(rp),intent(out)::              x1,d1
+        integer(ip)::                       k,i,l
+        integer(ip),parameter::             m = 30  !number of terms in Taylor expansion
+        real(rp)::                          m1,c,step,dx,x0,x11,y0
+        real(rp),dimension(m)::             z,z1,z2
+        real(rp),dimension(10)::            x2
+        real(rp),dimension(m+1)::           u,up,x1k
+            
+            ! find the first root (note H_n'(0) = 0)
+            ! advance ODE via Runge-Kutta for initial approx
+            !x1 = odeRK2(0._rp,-pi/2,0._rp,n)  
+            !   x1 = odeRK2(0._rp,-pi/2,0._rp,n)
+            !   odeRK2_TVD_1step(dydx,dx,x0,y0)
+            x0 = 0._rp
+            x11 = -pi/2._rp
+            y0 = 0._rp
+            dx = (x11 - x0)/10._rp
+            x2 = odeRK2(dydx, dx, x0, y0, 10)
+            x1 = x2(10)
+            !scaling
+            m1 = 1._rp/x1
+            !initialise
+            u = 0._rp
+            up = 0._rp
+            
+            !recurrence relation for Legendre polynomials
+            u(1) = H
+            u(3) = -0.5_rp*(2._rp*n+1)*u(1)/m1**2   !attention
+            up(1) = 0._rp 
+            up(2) = 2._rp*u(3)*m1
+            do k = 2,m-2,2
+                u(k+3) = (-(2._rp*n+1)*u(k+1)/m1**2 + u(k-1)/m1**4)/((k+1)*(k+2))
+                up(k+2) = (k+2)*u(k+3)*m1
+            end do
+            
+            !flip for more accuracy in inner product calculation
+            u = [(u(i) ,i = m+1,1,-1)]
+            up =[(up(i),i = m+1,1,-1)]
+            z = 0._rp                                                  
+            z1 = m1*x1+z
+            z2 = cumprod(z1)                                          
+            x1k = [m1,(z2(i),i=1,m)]
+            step = maxrp                                                
+            l = 0
+            
+            !Newton iteration
+            do while ((abs(step)>GlobalEps).and.(l<10))
+                l = l + 1
+                step = (u.ip.x1k)/(up.ip.x1k)
+                x1 = x1 - step
+                !powers of h (This is the fastest way!)
+                z1 = m1*x1+z
+                z2 = cumprod(z1)
+                x1k = [1._rp,(z2(i),i=1,m)]
+                x1k = [(x1k(i),i=m+1,1,-1)]
+            end do
+            
+            !Update derivative
+            d1 = (up.ip.x1k)
+            
+        end subroutine alg2_Herm
+        
+        !-------------------------------------------------------
+        pure real(rp) function dydx(x0,y0) result(y)
+        real(rp),intent(in)::       x0,y0
+            y=-1._rp/(sqrt(2._rp*n+1-y0**2) - 0.5_rp*y0*sin(2._rp*x0)/(2._rp*n+1-y0**2))
+        end function dydx
+                
+        !-------------------------------------------------------
         pure subroutine hermpts_rec(n)
-        integer(ip),intent(in)::                                n
-        real(rp),dimension(:),allocatable::                     x1,w1,v1    
-        integer(ip)::                                           m
+        integer(ip),intent(in)::            n
+        real(rp),dimension(:),allocatable:: x1,w1,v1    
+        integer(ip)::                       m
         
             m=ishft(n,-1)
             if(ibits(n,0,1)==1) then
@@ -670,13 +691,14 @@ contains
             end if
         
         end subroutine hermpts_rec
+        
         !-------------------------------------------------------
         pure subroutine Hermpts_recParameter(n,m,x1,w1,v1)
-        integer(ip),intent(in)::                                n
-        integer(ip),intent(inout)::                             m
-        real(rp),dimension(:),intent(out)::                     x1,w1,v1    
-        real(rp),dimension(:),allocatable::                     x0,val,dval,dx
-        integer(ip)::                                           kk,i,size_para  
+        integer(ip),intent(in)::            n
+        integer(ip),intent(inout)::         m
+        real(rp),dimension(:),intent(out):: x1,w1,v1    
+        real(rp),dimension(:),allocatable:: x0,val,dval,dx
+        integer(ip)::                       kk,i,size_para  
         
             size_para=size(x1)
             allocate(x0(size_para),val(size_para),dval(size_para),dx(size_para))
@@ -687,25 +709,27 @@ contains
                 call hermpoly_rec(n,x0,val,dval)  
                 dx = val/dval
                 do i = 1,size(dx)
-                    if(isnan(dx(i))) dx(i)=0._rp 
+                    if(isnan(dx(i))) dx(i) = 0._rp
                 end do
                 x0 = x0 - dx
                 if(norm(dx,-1)<sqrt(GlobalEps)) exit
             end do
         
             x1 = x0/sqrt(2._rp)
-            w1 = (exp(-x1**2)/dval**2)              !quadrature weights
-            v1 = exp(-x1**2/2._rp)/dval             !Barycentric weights
+            w1 = (exp(-x1**2)/dval**2)      !quadrature weights
+            v1 = exp(-x1**2/2._rp)/dval     !Barycentric weights
+            
         end subroutine Hermpts_recParameter
         
         !-------------------------------------------------------
         pure subroutine HermiteInitialGuesses(m,n,x)
-        integer(ip),intent(in)::                    m,n
-        real(rp),dimension(:),intent(out)::         x
-        integer::                                   i,k
-        real(rp)::                                  a,nu,p,tin
-        real(rp),dimension(m)::                     airyrts,x_init,x_init_airy,Tnk0,rhs,val,dval,dTnk0,tnk,x_init_sin 
-        real(rp),dimension(10)::                    airyrts_exact
+        integer(ip),intent(in)::            m,n
+        real(rp),dimension(:),intent(out):: x
+        integer::                           i,k
+        real(rp)::                          a,nu,p,tin
+        real(rp),dimension(m)::             airyrts,x_init,x_init_airy,Tnk0,rhs,val,dval,dTnk0,tnk,x_init_sin 
+        real(rp),dimension(10)::            airyrts_exact
+        
             ! hermiteintitialguesses(n), Initial guesses for Hermite zeros.
             if(ibits(n,0,1)==1) then
                 a =  0.5_rp
@@ -731,12 +755,11 @@ contains
                 (16._rp/1575._rp*airyrts+92._rp/7875._rp*airyrts**4)*2**(2._rp/3._rp)*nu**(-5._rp/3._rp) - &
                 (15152._rp/3031875._rp*airyrts**5+1088._rp/121275._rp*airyrts**2)*2**(1._rp/3._rp)*nu**(-7._rp/3._rp),kind=rp)),kind=rp)  
             x_init_airy(1:m) = x_init(m:1:-1)
-     
+
             ! Tricomi initial guesses. Equation (2.1) in [1]. Originally in [2].
             ! These initial guesses are good near x = 0 . Note: zeros of besselj(+/-.5,x)
             ! are integer and half-integer multiples of pi.
             ! x_init_bess =  bess/sqrt(nu).*sqrt((1+ (bess.^2+2*(a^2-1))/3/nu^2) );
-    
             Tnk0 = [(pi/2,i=1,m)]
             nu = 4*m+2*a+2
             rhs = [((4*m-4*i+3)/nu*pi,i=1,m)]
@@ -759,16 +782,19 @@ contains
                 x = x_init(1:m)
             end if
             
-        end subroutine HermiteInitialGuesses   
+        end subroutine HermiteInitialGuesses
+        
         !-------------------------------------------------------
         pure real(rp) function T(x) result(y)
         real(rp),intent(in)::               x
         
-            y = x**(2._rp/3._rp)*(1._rp + 5._rp/48._rp*x**(-2) - 5._rp/36._rp*x**(-4) + (77125._rp/82944._rp)*x**(-6) - &
-                108056875._rp/6967296._rp*x**(-8) + 162375596875._rp/334430208._rp*x**(-10))
+            y = x**(2._rp/3._rp)*(1._rp + 5._rp/48._rp*x**(-2) - 5._rp/36._rp*x**(-4) + &
+                                (77125._rp/82944._rp)*x**(-6) - 108056875._rp/6967296._rp*x**(-8) + &
+                                162375596875._rp/334430208._rp*x**(-10))
         
         end function T
-        !--------------------------------------------------------------------------
+        
+        !-------------------------------------------------------
         pure subroutine hermpoly_rec(n,x0,val,dval)
         integer(ip),intent(in)::                        n
         real(rp),dimension(:),intent(in)::              x0
@@ -788,6 +814,7 @@ contains
             val = Hnew
             dval = (-x0*Hnew + n**(1._rp/2._rp)*Hold)
         end subroutine hermpoly_rec
+        
         !--------------------------------------------------------------------------
         pure subroutine hermpts_asy(n)
         integer(ip),intent(in)::                        n
@@ -796,9 +823,9 @@ contains
             !x = Gauss-Hermite nodes, w = quad weights, v = bary weights.
             call disableProgram    
         end subroutine hermpts_asy
-        !--------------------------------------------------------------------------
         
     end subroutine GaussHermitePhys
+    
     !----------------------------------------------------------------------------------------------------------------------------------
     pure subroutine GaussHermiteProb(quadx,quadw)
     real(rp),dimension(:),intent(out)::                     quadx,quadw
@@ -809,7 +836,7 @@ contains
        
     end subroutine GaussHermiteProb
     
-!----------------------------------------------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
     pure subroutine GaussHermitePhys_GW(quadx,quadw)
     real(rp),dimension(:),intent(out)::                     quadx,quadw
     integer(ip)::                                           n
@@ -820,13 +847,13 @@ contains
     contains
     
         pure subroutine GolubWelsch_eigenvalueMethod(n)
-        integer(ip),intent(in)::                        n
-        integer(ip)::                                   i
-        integer(ip),dimension(n)::                      index_
-        integer(ip),dimension(ishft(n,-1))::            ii
-        real(rp),dimension(n)::                         Value1,D_G
-        real(rp),dimension(n,n)::                       Z_real
-        real(rp),dimension(ishft(n,-1))::               x_half,w_half,v_half
+        integer(ip),intent(in)::                    n
+        integer(ip)::                               i
+        integer(ip),dimension(n)::                  index_
+        integer(ip),dimension(ishft(n,-1))::        ii
+        real(rp),dimension(n)::                     Value1,D_G
+        real(rp),dimension(n,n)::                   Z_real
+        real(rp),dimension(ishft(n,-1))::           x_half,w_half,v_half
         
             call GolubWelschParameter(n,D_G,Z_real,index_)
             quadx = D_G
@@ -844,17 +871,18 @@ contains
             end if    
             
         end subroutine GolubWelsch_eigenvalueMethod
+        
         !--------------------------------------------------------------------------
         pure subroutine GolubWelschParameter(n,D_G,Z_real,index_)
-        integer(ip),intent(in)::                            n
-        real(rp),dimension(:),intent(out)::                 D_G
-        real(rp),dimension(:,:),intent(out)::               Z_real
-        integer(ip),dimension(:),intent(out)::              index_
-        integer(ip)::                                       i
-        real(rp),dimension(n-1)::                           beta,D
-        real(rp),dimension(n)::                             Value1
-        real(rp),dimension(n,n)::                           T
-        complex(rp),dimension(n,n)::                        Z
+        integer(ip),intent(in)::                    n
+        real(rp),dimension(:),intent(out)::         D_G
+        real(rp),dimension(:,:),intent(out)::       Z_real
+        integer(ip),dimension(:),intent(out)::      index_
+        integer(ip)::                               i
+        real(rp),dimension(n-1)::                   beta,D
+        real(rp),dimension(n)::                     Value1
+        real(rp),dimension(n,n)::                   T
+        complex(rp),dimension(n,n)::                Z
         
             beta = [(sqrt(0.5_rp*i),i=1,n-1)]
             T = diag(beta,1)+diag(beta,-1)                  
@@ -869,7 +897,7 @@ contains
         
     end subroutine GaussHermitePhys_GW
     
-!--------------------------------------------------------------------------------------------------
+    !--------------------------------------------------------------------------------------------------
     !https://github.com/chebfun/chebfun/blob/34f92d12ca51003f5c0033bbeb4ff57ac9c84e78/%40chebtech2/chebpts.m
     !https://github.com/chebfun/chebfun/blob/34f92d12ca51003f5c0033bbeb4ff57ac9c84e78/%40chebtech2/quadwts.m
     !also refer to <lwReference>/<Fast Construction of the Fejer and Clenshaw-Curtis Quadrature Rules>
@@ -945,7 +973,7 @@ contains
     
     
     
-!----------------------------------------------------
+    !----------------------------------------------------
     !refer to http://people.sc.fsu.edu/~jburkardt/f_src/sandia_sparse/sandia_sparse.f90
     pure integer(ip) function SparseGridSize(dim,level,quadratureRule) result(n)
     integer(ip),intent(in)::        dim,level
@@ -1065,18 +1093,19 @@ contains
         npSparseGrid= size(cubx,dim=2)
         
         if(rule == 'cc') then
-            !--
-            call ClosefullyNest(dimSparseGrid,level,npSparseGrid, cubx,cubw)   !close fully nested
+            !--close fully nested
+            call ClosefullyNest(dimSparseGrid,level,npSparseGrid, cubx,cubw)
             !--
         elseif(rule == 'gh'.or. rule == 'gl') then
-            !--
-            call OpenWeaklyNest(dimSparseGrid,level,npSparseGrid, rule(1:2), cubx,cubw)   !open weakly nested, only nest the middle point
+            !--open weakly nested, only nest the middle point
+            call OpenWeaklyNest(dimSparseGrid,level,npSparseGrid, rule(1:2), cubx,cubw)
             !--
         else
             call disableprogram
         endif
     
     contains
+    
         !--
         subroutine CloseFullyNest(dim,maxlvl,npSg,x,w)
         integer(ip),intent(in)::                dim,maxlvl,npSg
@@ -1101,8 +1130,8 @@ contains
                         x(id,ipt) = 0._rp
                     else
                         ! pi -> 0, the same as | - cos(i * pi / real(nm1,kind=rp)) | i = 0:nm1
-                        x(id,ipt) = cos ( real ( npMaxlvl - i, kind = rp ) * pi & 
-                                    / real ( npMaxlvl - 1, kind = rp ) )
+                        x(id,ipt) = cos(real(npMaxlvl - i, kind = rp)*pi &
+                                    / real(npMaxlvl - 1, kind = rp))
                     endif
                 enddo
             enddo
