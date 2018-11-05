@@ -105,12 +105,16 @@ implicit none
         import:: rp
         real(rp),intent(in)::   x
         end function absf1
+        
+        elemental real(rp) function absf2(x,y) result(z)
+        import:: rp
+        real(rp),intent(in)::   x,y
+        end function absf2
     end interface
     
-    
-    
-    
+!===================
 contains
+!===================
 
     !--compare two scalar byte by byte
     elemental logical(lp) function anyiseq(lhs,rhs) result(r)
@@ -217,5 +221,32 @@ contains
     logical(lp)::               t
         t = a; a = b; b = t
     end subroutine swapLogi
+    
+    !--
+    subroutine writefunc(func,lo,up,np,filename)
+    procedure(absf1)::                  func
+    real(rp),intent(in)::               lo,up
+    integer(ip),intent(in)::            np
+    character(*),optional,intent(in)::  filename
+    character(cl)::                     fn
+    integer(ip)::                       i
+    real(rp)::                          x,dx
+    
+        if(present(filename)) then
+            fn = filename
+        else
+            fn = 'func'
+        endif
+        dx = (up-lo)/(np-1)
+        
+        open(unit=99, file=trim(fn)//'.dat')
+        write(99,*) 'variables=x,'//trim(fn)
+        do i=1,np
+            x = lo + (i-1)*dx
+            write(99,*) x, func(x)
+        enddo
+        close(99)
+    
+    end subroutine writefunc
     
 end module constants

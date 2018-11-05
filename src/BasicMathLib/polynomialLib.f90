@@ -10,7 +10,8 @@ implicit none
     
 contains
 
-    !use modified Chebyshev algorithm to generate the Orthogonal Polynomials
+    !use modified Chebyshev algorithm to generate the Orthogonal Polynomials which is generally represented
+    !by recurrence form: p_{k+1}(x) = (x - alpha_{k})*p_{k}(x) - beta_{k}*p_{k-1}(x) | p_{-1}=0, p_{0}=1
     !input---
     !a(2n-1),b(2n-1): the recursive coef for kernel polynomial h
     !mom(2n): the moment \int{h_i(x), dP(x)} | if a=0 and b=0 -> h_i = x^i which is original chebyshev algo
@@ -60,6 +61,33 @@ contains
         
     end subroutine mChebAlgo
 
+    
+    !coef for common-used orthogonal polynomial
+    !p_{k+1}(x) = (x - alpha_{k})*p_{k}(x) - beta_{k}*p_{k-1}(x) | p_{-1}=0, p_{0}=1
+    pure subroutine recurrenceCoef(polytype,n,a,b)
+    character(*),intent(in)::           polytype
+    integer(ip),intent(in)::            n
+    real(rp),dimension(0:),intent(out)::a,b
+    integer(ip)::                       k
+    
+        a = 0._rp
+        if(polytype=='legendre') then
+            b(0) = 2._rp
+            do k=1,n
+                b(k) = 1._rp/(4._rp - 1._rp/(k-1)**2)
+            enddo
+        elseif(polytype=='chebyshev1') then
+            b(0) = 4._rp*pi
+            if(n==0) return
+            b(1) = 0.5_rp
+            b(2:n) = 0.25_rp
+        else
+            call disableprogram
+        endif
+    
+    end subroutine recurrenceCoef
+    
+    
     
     !--
     !input

@@ -38,6 +38,7 @@ implicit none
     interface solveLinearLeastSquare
         procedure:: solveLinearLeastSquare_1rhs
         procedure:: solveLinearLeastSquare_nrhs
+        procedure:: solveLinearLeastSquare_Constrain
     end interface solveLinearLeastSquare
     
 contains
@@ -139,14 +140,25 @@ contains
         call gels(a,b0)
         b = b0(:,1)
     end subroutine solveLinearLeastSquare_1rhs
-    !--
+
     !see https://www.quora.com/Is-it-better-to-do-QR-Cholesky-or-SVD-for-solving-least-squares-estimate-and-why
     !the different least square methods based on QR or SVD 
     pure subroutine solveLinearLeastSquare_nrhs(a,b)
     real(rp),dimension(:,:),intent(inout):: a,b
-        call gels(a,b)  !QR, 
+        call gels(a,b)  !QR
         !call gelss(a,b) !SVD, sigular value decomposition
     end subroutine solveLinearLeastSquare_nrhs
+
+    !solve min|c-ax| s.t. bx=d
+    pure subroutine solveLinearLeastSquare_Constrain(a,b,c,d,x,info)
+    real(rp),dimension(:,:),intent(inout):: a,b
+    real(rp),dimension(:),intent(inout)::   c,d
+    real(rp),dimension(:),intent(out)::     x
+    integer(ip),optional,intent(out)::      info
+    integer(4)::                            i
+        call gglse(a,b,c,d,x,i)
+        if(present(info)) info = i
+    end subroutine solveLinearLeastSquare_Constrain
     !dir$ endif
     
     

@@ -5,7 +5,7 @@ implicit none
     private
     !--
     public:: readKeyVal
-    public:: countsubstring,lowerString,upperString
+    public:: countsubstring,lowerString,upperString,bondString
     
     
     !--------------------------------------------------
@@ -18,9 +18,10 @@ implicit none
     end interface readKeyVal
     
     
+!=======================================
 contains
+!=======================================
 
-!-------------------------------------------------
     !--
     elemental subroutine lowerString(str)
     character(*),intent(inout)::str
@@ -28,7 +29,7 @@ contains
         do i=1,len(str)
             n = ichar(str(i:i))
             if(n>=uppercase_a.and.n<=uppercase_z) then
-                str(i:i) = char ( ichar(str(i:i)) - uppercase_a + lowercase_a )
+                str(i:i) = char(ichar(str(i:i)) - uppercase_a + lowercase_a)
             endif
         enddo
     end subroutine lowerString
@@ -40,7 +41,7 @@ contains
         do i=1,len(str)
             n = ichar(str(i:i))
             if(n>=lowercase_a.and.n<=lowercase_z) then
-                str(i:i) = char ( ichar(str(i:i)) - lowercase_a + uppercase_a )
+                str(i:i) = char(ichar(str(i:i)) - lowercase_a + uppercase_a)
             endif
         enddo
     end subroutine upperString
@@ -49,6 +50,7 @@ contains
     elemental function countsubstring(string,substring) result(n)
     character(*),intent(in)::   string,substring
     integer(ip)::               n,loc,ls,i
+    
         n   = 0
         ls  = len(substring)
         if( ls <= 0 .or. ls > len(string)) return
@@ -63,10 +65,17 @@ contains
                 exit
             endif
         enddo
+        
     end function countsubstring
     
-!-----------------------------------------------------------
     !--
+    pure function bondString(s1,s2)
+    character(*),intent(in)::       s1,s2
+    character(len(s1)+len(s2))::    bondString
+        bondString = s1//s2
+    end function bondString
+    
+    !===================================================
     pure subroutine readKeyVal_char(string,key,val)
     character(*),intent(in)::   string,key
     character(*),intent(out)::  val

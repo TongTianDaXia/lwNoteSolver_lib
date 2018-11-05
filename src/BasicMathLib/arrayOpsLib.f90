@@ -3,19 +3,23 @@ use constants, only:ip,rp,lp,zero,swap
 implicit none
 
     private
+    
+    !--operator for vector and matrix
     public:: operator(.ip.),operator(.op.),operator(.cpv.),operator(.cps.)
     public:: operator(-),operator(+),operator(*),operator(.eqv.),operator(.eqvs.)
+    
+    !--operation based on the array
     public:: magSqr, mag, angle, normalize, para, orth, rot2, rot2deg, norm, polyval
     public:: trace, diag, sort, cumprod, trans, repmat, bondcol, bondrow
     
-    !indice ops
+    !--indice ops
     public:: compositionNext,combinationNext,colexNext
     
-    !compress stored row
+    !--compress stored row, for sparse matrix
     public:: diagIxCsr
     
     
-!---------------------------------------------
+    !==============================================
     interface operator(*)
         procedure:: mvinnerproduct
         procedure:: vminnerproduct
@@ -61,6 +65,12 @@ implicit none
     
     
     !---------------
+    interface polyval
+        procedure:: polyval_horner
+        procedure:: polyval_mat_horner
+        procedure:: polyval_matv
+    end interface polyval
+    
     interface rot2
         procedure:: rot2Cs
         procedure:: rot2Theta
@@ -106,11 +116,9 @@ implicit none
         procedure:: colexNext_anisotropy
     end interface colexNext
     
-!-------------------------------------------------------
-    
+!=======================================================
 contains
-
-!-------------------------------------------------------
+!=======================================================
 
     pure real(rp) function mag(v)
     real(rp),dimension(:),intent(in)::  v
@@ -169,7 +177,6 @@ contains
         r(2) = sind(theta)*v(1) + cosd(theta)*v(2)
     end function rot2deg
     
-    
     !Lp norm
     pure real(rp) function norm(v,p)
     real(rp),dimension(:),intent(in)::  v
@@ -189,21 +196,60 @@ contains
     end function norm
     
     !---------
-    pure real(rp) function polyval(a,x)
+    !pure real(rp) function polyval(a,x)
+    !real(rp),dimension(0:),intent(in):: a
+    !real(rp),intent(in)::               x
+    !integer(ip)::                       i
+    !    polyval = 0._rp
+    !    if(abs(x)<1._rp) then
+    !        do i=ubound(a,1),0,-1
+    !            polyval = polyval + a(i)*x**i
+    !        enddo
+    !    else
+    !        do i=0,ubound(a,1)
+    !            polyval = polyval + a(i)*x**i
+    !        enddo
+    !    endif
+    !end function polyval
+    !--refer to https://en.wikipedia.org/wiki/Horner%27s_method#cite_note-9
+    pure real(rp) function polyval_horner(a,x) result(val)
     real(rp),dimension(0:),intent(in):: a
     real(rp),intent(in)::               x
     integer(ip)::                       i
-        polyval = 0._rp
-        if(abs(x)<1._rp) then
-            do i=ubound(a,1),0,-1
-                polyval = polyval + a(i)*x**i
-            enddo
-        else
-            do i=0,ubound(a,1)
-                polyval = polyval + a(i)*x**i
-            enddo
-        endif
-    end function polyval
+        val = 0._rp
+        do i=ubound(a,1),0,-1
+            val = val*x + a(i)
+        enddo
+    end function polyval_horner
+    
+    !compute p(x)
+    pure function polyval_mat_horner(a,x) result(val)
+    real(rp),dimension(0:),intent(in)::         a
+    real(rp),dimension(:,:),intent(in)::        x
+    real(rp),dimension(size(x,1),size(x,2))::   val
+    integer(ip)::                               i,j,n
+        n = size(x,1)
+        val = 0._rp
+        do i=ubound(a,1),0,-1
+            val = (val.ip.x) + [(a(i),j=1,n)]
+        enddo
+    end function polyval_mat_horner
+    
+    !compute p(x)v
+    pure function polyval_matv(a,x,v) result(val)
+    real(rp),dimension(0:),intent(in)::         a
+    real(rp),dimension(:,:),intent(in)::        x
+    real(rp),dimension(:),intent(in)::          v
+    real(rp),dimension(size(v))::               val,xv
+    integer(ip)::                               i
+        xv = v
+        val = a(0)*v
+        do i=1,ubound(a,1)
+            xv = x.ip.xv
+            val = val + a(i)*xv
+        enddo
+    end function polyval_matv
+    
     
     !---------
     pure function diagCreateMatrix(m,k)
@@ -245,9 +291,7 @@ contains
     end function trace
     
     
-    !---
-    !bubble sort
-    !--
+    !--bubble sort
     pure subroutine sort1_i(a,loca)
     integer(ip),dimension(:),intent(inout)::a
     integer(ip),dimension(:),&
@@ -453,6 +497,7 @@ contains
         allocate(r, source=trans(bondcol(a,b,c)))
     end function bondrow_vvvr
     
+    !================================================================================
     !computes the compositions of the integer n into k parts | dim(a)=k; sum(a)=|a|=n
     !e.g. n=3, k=2: (3,0)(2,1)(1,2)(0,3) | totally 4 kinds, and this subroutine accomplish this order for next
     !On the first call to this routine, set MORE = FALSE.  The routine will compute the first element in the 
@@ -577,7 +622,7 @@ contains
     end subroutine colexNext_isotropy
     
     
-!------------------------------------------------------------------
+    !=======================================================================
     !given csr sparse matrix, give diag index of ia(j)-ia(j+1) for each row
     !ia(n+1), ja(nnz), da(n)
     !tip: ia(1) = 1, ia(n+1) = nnz + 1
@@ -594,9 +639,7 @@ contains
     end subroutine diagIxCsr
     
     
-    
-!---------------------inner product--------------------------------
-    !--
+    !=======================inner product==================
     pure real(rp) function vvinnerproduct(lhs,rhs) result(p)
     real(rp),dimension(:),intent(in)::  lhs,rhs
         p = dot_product(lhs,rhs)
