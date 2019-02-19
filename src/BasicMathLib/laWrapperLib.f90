@@ -26,6 +26,7 @@ implicit none
     
     !rely on the lapack
     !dir$ if .not. defined(noMKL)
+    public:: choleskyFactorSym
     public:: solveLinearLeastSquare
     public:: solveSymmetryLES
     public:: eigenSymTriDiagonal
@@ -150,6 +151,8 @@ contains
     end subroutine solveLinearLeastSquare_nrhs
 
     !solve min|c-ax| s.t. bx=d
+    !the dimension: a(m,n) | c(m) | b(p,n) | d(p) | x(n)
+    !should be: p<=n<=m+p; rank(b)=p; rank(a/b)=n (full rank)
     pure subroutine solveLinearLeastSquare_Constrain(a,b,c,d,x,info)
     real(rp),dimension(:,:),intent(inout):: a,b
     real(rp),dimension(:),intent(inout)::   c,d
@@ -173,6 +176,15 @@ contains
     end subroutine inverseGeneralSquareMat
     !dir$ end if
     
+    !dir$ if defined (noMKL)
+    !dir$ else
+    !if a is positive-definite matrix, it can be factor as a=R^TR
+    !in this subroutine, we assume a is symmetric
+    pure subroutine choleskyFactorSym(a)
+    real(rp),dimension(:,:),intent(inout)::     a
+        call potrf(a,'U')
+    end subroutine choleskyFactorSym
+    !dir$ end if
     
     !dir$ if defined (noMKL)
     !input a [(2:n,1),(1:n,2),(1:n-1,3)]
@@ -218,8 +230,7 @@ contains
     
 
 !--------------------------------------------------------------
-!emergency only and very limited
-    
+    !emergency only and very limited
     !m[in] is matrix, and m[out] is [L-I+U] witout the unit dialog of L
     !this is only for square matrix, and without ipiv unlike getrf in lapack
     !--
@@ -376,7 +387,7 @@ contains
     end subroutine gmres
 
 !-----------------------------------------------    
-!dir$ if .not. defined(noMKL)
+    !dir$ if .not. defined(noMKL)
     !Ax=b | A=A(a,ia,ja) | input x0 output x |
     subroutine fgmresILUT(a,ia,ja,b,x)
     real(8),dimension(:),intent(in)::       a
@@ -516,12 +527,12 @@ contains
             call dfgmres_check(n, x, b, rciRequest, ipar, dpar, tmp)
         end subroutine setCheck
     end subroutine fgmres
-!dir$ else
+    !dir$ else
     
-!dir$ end if
+    !dir$ end if
     
     
-!dir$ if .not. defined(noMKL)
+    !dir$ if .not. defined(noMKL)
     !ge[sparse representation of a general matrix]
     !mv[matrix-vector product ]
     subroutine csrAx(a,ia,ja,x,b)
@@ -530,7 +541,7 @@ contains
     real(rp),dimension(:),intent(out)::     b
         call mkl_dcsrgemv('n', size(x), a, ia, ja, x, b)
     end subroutine csrAx
-!dir$ else
+    !dir$ else
     pure subroutine csrAx(a,ia,ja,x,b)
     real(rp),dimension(:),intent(in)::      a,x
     integer(ip),dimension(:),intent(in)::   ia,ja
@@ -543,7 +554,7 @@ contains
             b(i) = b(i) + (a(j:k) .ip. x(ja(j:k)))
         enddo
     end subroutine csrAx
-!dir$ end if
+    !dir$ end if
     
     pure function polyfit(x,y,n)
     real(rp),dimension(:),intent(in)::  x,y

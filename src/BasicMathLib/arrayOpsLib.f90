@@ -237,11 +237,11 @@ contains
     
     !compute p(x)v
     pure function polyval_matv(a,x,v) result(val)
-    real(rp),dimension(0:),intent(in)::         a
-    real(rp),dimension(:,:),intent(in)::        x
-    real(rp),dimension(:),intent(in)::          v
-    real(rp),dimension(size(v))::               val,xv
-    integer(ip)::                               i
+    real(rp),dimension(0:),intent(in)::     a
+    real(rp),dimension(:,:),intent(in)::    x
+    real(rp),dimension(:),intent(in)::      v
+    real(rp),dimension(size(v))::           val,xv
+    integer(ip)::                           i
         xv = v
         val = a(0)*v
         do i=1,ubound(a,1)

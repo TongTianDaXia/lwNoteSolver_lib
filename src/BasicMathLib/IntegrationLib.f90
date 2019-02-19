@@ -796,11 +796,11 @@ contains
         
         !-------------------------------------------------------
         pure subroutine hermpoly_rec(n,x0,val,dval)
-        integer(ip),intent(in)::                        n
-        real(rp),dimension(:),intent(in)::              x0
-        real(rp),dimension(:),intent(out)::             val,dval
-        integer(ip)::                                   k
-        real(rp),dimension(size(x0))::                  Hold,H,Hnew      
+        integer(ip),intent(in)::            n
+        real(rp),dimension(:),intent(in)::  x0
+        real(rp),dimension(:),intent(out):: val,dval
+        integer(ip)::                       k
+        real(rp),dimension(size(x0))::      Hold,H,Hnew      
             !HERMPOLY_rec evaluation of scaled Hermite poly using recurrence
             !evaluate:
             Hold = exp(-x0**2/4._rp) 
@@ -817,7 +817,7 @@ contains
         
         !--------------------------------------------------------------------------
         pure subroutine hermpts_asy(n)
-        integer(ip),intent(in)::                        n
+        integer(ip),intent(in)::n
             !HERMPTS_ASY, fast algorithm for computing Gauss-Hermite nodes and weights 
             !using Newton's method with polynomial evaluation via asymptotic expansions.
             !x = Gauss-Hermite nodes, w = quad weights, v = bary weights.
@@ -828,7 +828,7 @@ contains
     
     !----------------------------------------------------------------------------------------------------------------------------------
     pure subroutine GaussHermiteProb(quadx,quadw)
-    real(rp),dimension(:),intent(out)::                     quadx,quadw
+    real(rp),dimension(:),intent(out):: quadx,quadw
    
             call GaussHermitePhys(quadx,quadw)
             quadx = quadx*sqrt(2._rp)
@@ -838,8 +838,8 @@ contains
     
     !-----------------------------------------------------------------------------------------------
     pure subroutine GaussHermitePhys_GW(quadx,quadw)
-    real(rp),dimension(:),intent(out)::                     quadx,quadw
-    integer(ip)::                                           n
+    real(rp),dimension(:),intent(out):: quadx,quadw
+    integer(ip)::                       n
     
         n=size(quadx)
         call GolubWelsch_eigenvalueMethod(n)
@@ -847,13 +847,13 @@ contains
     contains
     
         pure subroutine GolubWelsch_eigenvalueMethod(n)
-        integer(ip),intent(in)::                    n
-        integer(ip)::                               i
-        integer(ip),dimension(n)::                  index_
-        integer(ip),dimension(ishft(n,-1))::        ii
-        real(rp),dimension(n)::                     Value1,D_G
-        real(rp),dimension(n,n)::                   Z_real
-        real(rp),dimension(ishft(n,-1))::           x_half,w_half,v_half
+        integer(ip),intent(in)::            n
+        integer(ip)::                       i
+        integer(ip),dimension(n)::          index_
+        integer(ip),dimension(ishft(n,-1))::ii
+        real(rp),dimension(n)::             Value1,D_G
+        real(rp),dimension(n,n)::           Z_real
+        real(rp),dimension(ishft(n,-1))::   x_half,w_half,v_half
         
             call GolubWelschParameter(n,D_G,Z_real,index_)
             quadx = D_G
@@ -874,15 +874,15 @@ contains
         
         !--------------------------------------------------------------------------
         pure subroutine GolubWelschParameter(n,D_G,Z_real,index_)
-        integer(ip),intent(in)::                    n
-        real(rp),dimension(:),intent(out)::         D_G
-        real(rp),dimension(:,:),intent(out)::       Z_real
-        integer(ip),dimension(:),intent(out)::      index_
-        integer(ip)::                               i
-        real(rp),dimension(n-1)::                   beta,D
-        real(rp),dimension(n)::                     Value1
-        real(rp),dimension(n,n)::                   T
-        complex(rp),dimension(n,n)::                Z
+        integer(ip),intent(in)::                n
+        real(rp),dimension(:),intent(out)::     D_G
+        real(rp),dimension(:,:),intent(out)::   Z_real
+        integer(ip),dimension(:),intent(out)::  index_
+        integer(ip)::                           i
+        real(rp),dimension(n-1)::               beta,D
+        real(rp),dimension(n)::                 Value1
+        real(rp),dimension(n,n)::               T
+        complex(rp),dimension(n,n)::            Z
         
             beta = [(sqrt(0.5_rp*i),i=1,n-1)]
             T = diag(beta,1)+diag(beta,-1)                  

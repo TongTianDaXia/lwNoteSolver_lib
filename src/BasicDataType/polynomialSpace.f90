@@ -24,8 +24,9 @@ implicit none
     
         private
         
-        integer(ip)::                               quadNp_
+        integer(ip)::                               quadnp_
         integer(ip)::                               truncOd_
+        integer(ip)::                               ncnp_
         
         type(polynomial),dimension(:),allocatable:: basis_
         character(10)::                             basisType_
@@ -35,9 +36,12 @@ implicit none
         real(rp)::                                  ipMeasCoef_
         
         !(0:so,1:np), use quadrature rule for innerproduct
-        real(rp),dimension(:,:),allocatable::       quadxBasis_
+        real(rp),dimension(:,:),allocatable::       quadBasisVal_
         real(rp),dimension(:),allocatable::         quadx_
         real(rp),dimension(:),allocatable::         quadw_
+        
+        !(1:ncnp, 0:so)
+        real(rp),dimension(:,:),allocatable::       NewtonCotesBasisVal_
         
         !use tribasis quadrature value for multiplication and division
         !val_{ijk} = \int \phi_i \phi_j \phi_k d(P(\xi))
@@ -53,10 +57,10 @@ implicit none
 
         !--
         generic::               quadval => quadval_x, quadval_jox, quadval_ig, quadval_igjo
-        procedure::             quadval_x   !return function val at x
-        procedure::             quadval_jox !return jth order basis val at point x
-        procedure::             quadVal_ig  !return function val at gauss point i
-        procedure::             quadval_igjo!return jth order basis val at gauss point i
+        procedure::             quadval_x       !return function val at x
+        procedure::             quadval_jox     !return jth order basis val at point x
+        procedure::             quadVal_ig      !return function val at gauss point i
+        procedure::             quadval_igjo    !return jth order basis val at gauss point i
         
         !--
         generic::               project => project_poly, project_func1
@@ -64,8 +68,11 @@ implicit none
         procedure::             project_func1   !one dimensional function
         
         !--
-        generic::               limit => limit_positive
-        procedure::             limit_positive
+        generic::               limit => limit_linear_positive
+        procedure::             limit_linear_positive
+        
+        generic::               limit2 => limit_quadprog_positive
+        procedure::             limit_quadprog_positive
         
         !--
         procedure::             writefunc => writefunc_ps
@@ -76,8 +83,8 @@ implicit none
         procedure::             dv      !divide
         !--unitary
         generic::               op => op1,op2
-        procedure::             op1     !user-defined operator
-        procedure::             op2     !
+        procedure::             op1     !user-defined unitary operator
+        procedure::             op2     !user-defined binary operator
         
         procedure::             sqt     !sqrt
         procedure::             ex      !exponent
@@ -117,6 +124,7 @@ contains
         
         !--3*so/2+1 is safe for triBasis, but not enough for other operator
         this%quadNp_ = merge(np, 4*truncOrder, present(np))
+        this%ncnp_ = 2*truncOrder
         
         !--
         allocate(this%basis_,source=basis)
@@ -171,10 +179,10 @@ contains
         select case(t)
         case(polytype(1))
             ba = normalLegendrepolynomialSet(od)
-            ba = sqrt(2._rp) * ba
+            ba = sqrt(2._rp)*ba
         case(polytype(2))
             ba = normalHermitePolynomialSet(od,'prob')
-            ba = sqrt(sqrt(2._rp)*spi) * ba
+            ba = sqrt(sqrt(2._rp)*spi)*ba
         case default
             stop 'error: polynomialSpace/init_od get error type'
         end select
@@ -195,13 +203,15 @@ contains
     character(*),intent(in)::                   quadType
     integer(ip),intent(in)::                    quadNp
     real(rp),intent(in)::                       ipMeasCoef
-    integer(ip)::                               od,np,i,j,k
+    real(rp)::                                  x
+    integer(ip)::                               od,np,ncnp,i,j,k
         
         if(allocated(this%quadw_)) deallocate(this%quadw_)
-        if(allocated(this%quadxBasis_)) deallocate(this%quadxBasis_)
+        if(allocated(this%quadBasisVal_)) deallocate(this%quadBasisVal_)
         if(allocated(this%triBasisQuadVal_)) deallocate(this%triBasisQuadVal_)
         np = quadNp
         od = ubound(basis,1)
+        ncnp = this%ncnp_
         
         !assume the accuracy of quadrature rule is N(clenshawcurtis eg.), guarantee the tribasis computation
         if(np<3*od) stop 'error: AskyPolynomialSpace/makeOpsCoef get a bad np or order'
@@ -214,10 +224,20 @@ contains
             call quadratureRule(quadType, this%quadx_, this%quadw_)
         endif
 
-        allocate(this%quadxBasis_(0:od,1:np))
+        !---
+        allocate(this%quadBasisVal_(0:od,1:np))
         do j=1,np
             do i=0,od
-                this%quadxBasis_(i,j) = basis(i)%funcval(this%quadx_(j))
+                this%quadBasisVal_(i,j) = basis(i)%funcval(this%quadx_(j))
+            enddo
+        enddo
+        
+        !--
+        allocate(this%NewtonCotesBasisVal_(ncnp,0:od))
+        do j=0,od
+            do i=1,ncnp
+                x = (i-1)*2._rp/(ncnp-1) - 1._rp    !@@@@ this is specified for legendre
+                this%NewtonCotesBasisVal_(i,j) = basis(j)%funcval(x)
             enddo
         enddo
         
@@ -226,8 +246,9 @@ contains
         do k=0,od
             do j=0,k
                 do i=0,j
-                    this%triBasisQuadVal_(i,j,k) = ipMeasCoef * &
-                        sum((this%quadxBasis_(i,:)*this%quadxBasis_(j,:)*this%quadxBasis_(k,:))*this%quadw_)
+                    this%triBasisQuadVal_(i,j,k) = ipMeasCoef*sum( &
+                        (this%quadBasisVal_(i,:)*this%quadBasisVal_(j,:)*this%quadBasisVal_(k,:)) &
+                        *this%quadw_)
                     this%triBasisQuadVal_(i,k,j) = this%triBasisQuadVal_(i,j,k)
                     this%triBasisQuadVal_(j,i,k) = this%triBasisQuadVal_(i,j,k)
                     this%triBasisQuadVal_(j,k,i) = this%triBasisQuadVal_(i,j,k)
@@ -240,10 +261,10 @@ contains
     end subroutine makeOpsCoef
 
     !============================================================
-    pure real(rp) function quadval_igjo(this,quadi,orderj)
+    elemental real(rp) function quadval_igjo(this,quadi,orderj)
     class(polynomialSpace),intent(in):: this
     integer(ip),intent(in)::            quadi,orderj
-        quadval_igjo = this%quadxBasis_(orderj,quadi)
+        quadval_igjo = this%quadBasisVal_(orderj,quadi)
     end function quadval_igjo
     
     !return the value at the quad point based on the coefficients[a]
@@ -251,7 +272,7 @@ contains
     class(polynomialSpace),intent(in):: this
     real(rp),dimension(0:),intent(in):: a
     integer(ip),intent(in)::            quadi
-        quadval_ig = sum(a*this%quadxBasis_(:,quadi))
+        quadval_ig = sum(a*this%quadBasisVal_(:,quadi))
     end function quadval_ig
     
     pure real(rp) function quadval_x(this,a,x)
@@ -261,7 +282,7 @@ contains
         quadval_x = sum(a*this%basis_([0:this%truncOd()])%funcval(x))
     end function quadval_x
     
-    pure real(rp) function quadval_jox(this,orderj,x)
+    elemental real(rp) function quadval_jox(this,orderj,x)
     class(polynomialSpace),intent(in):: this
     integer(ip),intent(in)::            orderj
     real(rp),intent(in)::               x
@@ -273,7 +294,7 @@ contains
     class(polynomialSpace),intent(in):: this
     procedure(absf1)::                  f1
     integer(ip),intent(in)::            ibasis
-        c = this%ipMeasCoef_*sum(f1(this%quadx_)*this%quadxBasis_(ibasis,:)*this%quadw_)
+        c = this%ipMeasCoef_*sum(f1(this%quadx_)*this%quadBasisVal_(ibasis,:)*this%quadw_)
     end function project_func1
     
     elemental real(rp) function project_poly(this,polyfunc,ibasis) result(c)
@@ -289,7 +310,7 @@ contains
     end function project_poly
     
     !-----
-    subroutine limit_positive(this,a)
+    subroutine limit_linear_positive(this,a)
     class(polynomialspace),intent(in)::     this
     real(rp),dimension(0:),intent(inout)::  a
     integer(ip)::                           i
@@ -298,22 +319,93 @@ contains
         beta = minrp
         eps = GlobalEps*a(0)
         do i=1,this%quadnp_
-        
             !the val at quadrature point based on the spectrum a
             quadval = this%quadval(a, i)
+            call checkval
+        enddo
+
+        !check bound val if in closed region
+        if(this%basisType_ == polytype(1)) then
+            quadval = this%quadval(a, -1._rp)
+            call checkval
+            quadval = this%quadval(a, 1._rp)
+            call checkval
+        endif
+        
+        if(beta>0._rp) a(1:this%truncOd_) = (1-beta)*a(1:this%truncOd_)
+        
+    contains
+    
+        subroutine checkval
             if(quadval<0._rp) then
                 !this b make u0 + (1-b)*sum(u_i\phi_i) = eps
                 b = quadval/(quadval - a(0)) + eps
                 b = max(0._rp, min(b, 1._rp))
-                !left the max b which guaratee the function at all of quadrature point positive
+                !leave the max b which guaratee the function at all of quadrature point positive
                 if(b>beta) beta = b
             endif
-
+        end subroutine checkval
+        
+    end subroutine limit_linear_positive
+    
+    !limit_quadprog_positive
+    subroutine limit_quadprog_positive(this,a)
+    class(polynomialspace),intent(in)::     this
+    real(rp),dimension(0:),intent(inout)::  a
+    integer(ip)::                           i
+    real(rp)::                              quadval,beta,b,eps
+    
+        beta = minrp
+        eps = GlobalEps*a(0)
+        do i=1,this%quadnp_
+            !the val at quadrature point based on the spectrum a
+            quadval = this%quadval(a, i)
+            call checkval
         enddo
 
+        !check bound val if in closed region
+        if(this%basisType_ == polytype(1)) then
+            quadval = this%quadval(a, -1._rp)
+            call checkval
+            quadval = this%quadval(a, 1._rp)
+            call checkval
+        endif
+        
         if(beta>0._rp) a(1:this%truncOd_) = (1-beta)*a(1:this%truncOd_)
         
-    end subroutine limit_positive
+    contains
+    
+        subroutine checkval
+            if(quadval<0._rp) then
+                !this b make u0 + (1-b)*sum(u_i\phi_i) = eps
+                b = quadval/(quadval - a(0)) + eps
+                b = max(0._rp, min(b, 1._rp))
+                !leave the max b which guaratee the function at all of quadrature point positive
+                if(b>beta) beta = b
+            endif
+        end subroutine checkval
+        
+    end subroutine limit_quadprog_positive
+    
+    !--
+    !subroutine limit_cls_positive(this,a,func)
+    !class(polynomialspace),intent(in)::     this
+    !real(rp),dimension(0:),intent(inout)::  a
+    !procedure(absf1)::                      func
+    !integer(ip)::                           i,n,ncnp
+    !real(rp)::                              x
+    !real(rp),dimension(:,:),allocatable::   b
+    !real(rp),dimension(:),allocatable::     ncVal,d
+    !
+    !    n = this%truncod_
+    !    ncnp = this%ncnp
+    !    allocate(ncVal(ncnp),b(1,0:n),d(1))
+    !    do i=1,ncnp
+    !        x = (i-1)*2._rp/(np-1) - 1._rp
+    !        ncVal(i) = func(x)
+    !    enddo
+    !    
+    !end subroutine limit_cls_positive
     
     
     !------------------------
@@ -391,7 +483,7 @@ contains
             quadKernel(i) = func(this%quadval(a, i))*this%quadw_(i)
         enddo
         do i=0,n
-            o(i) = this%ipMeasCoef_*sum(quadKernel*this%quadxBasis_(i,:))
+            o(i) = this%ipMeasCoef_*sum(quadKernel*this%quadBasisVal_(i,:))
         enddo
         
     end function op1
@@ -413,7 +505,7 @@ contains
             quadKernel(i) = func(x,y)*this%quadw_(i)
         enddo
         do i=0,n
-            o(i) = this%ipMeasCoef_*sum(quadKernel*this%quadxBasis_(i,:))
+            o(i) = this%ipMeasCoef_*sum(quadKernel*this%quadBasisVal_(i,:))
         enddo
     end function op2
     
@@ -562,7 +654,7 @@ contains
     
     
     !====Test
-    pure function op1_test(this,a,func) result(o)
+    pure function op1_ls(this,a,func) result(o)
     class(polynomialSpace),intent(in):: this
     real(rp),dimension(0:),intent(in):: a
     procedure(absf1)::                  func
@@ -588,10 +680,10 @@ contains
         call solvelinearleastsquare(mat, quadkernel)
         o = quadkernel(1:n+1)
         
-    end function op1_test
+    end function op1_ls
     
     !--
-    pure function op2_test(this,a,b,func) result(o)
+    pure function op2_ls(this,a,b,func) result(o)
     class(polynomialSpace),intent(in):: this
     real(rp),dimension(0:),intent(in):: a,b
     procedure(absf2)::                  func
@@ -617,7 +709,67 @@ contains
         call solvelinearleastsquare(mat, quadkernel)
         o = quadkernel(1:n+1)
         
-    end function op2_test
+    end function op2_ls
+    
+    !--
+    pure function op1_clsPositive(this,a,func) result(o)
+    class(polynomialSpace),intent(in)::     this
+    real(rp),dimension(0:),intent(in)::     a
+    procedure(absf1)::                      func
+    real(rp),dimension(0:ubound(a,1))::     o
+    integer(ip)::                           i,n,ncnp
+    real(rp)::                              x
+    real(rp),dimension(:,:),allocatable::   b
+    real(rp),dimension(:),allocatable::     ncVal,d
+    
+        n = this%truncod_
+        ncnp = this%ncnp_
+        allocate(ncVal(ncnp),b(1,0:n),d(1))
+        
+        do i=1,ncnp
+            x = (i-1)*2._rp/(ncnp-1) - 1._rp
+            ncVal(i) = func(this%quadval(a,x))
+        enddo
+        
+        i = minloc(ncVal, 1)
+        x = (i-1)*2._rp/(ncnp-1) - 1._rp
+        b(1,:) = this%quadval([0:n], x)
+        d = GlobalEps
+        
+        !solve min|c-ax| s.t. bx=d
+        call solvelinearleastsquare(this%NewtonCotesBasisVal_, b, ncVal, d, o, i)
+        
+    end function op1_clsPositive
+    
+    !--
+    pure function op2_clsPositive(this,a,b,func) result(o)
+    class(polynomialSpace),intent(in)::     this
+    real(rp),dimension(0:),intent(in)::     a,b
+    procedure(absf2)::                      func
+    real(rp),dimension(0:ubound(a,1))::     o
+    integer(ip)::                           i,n,ncnp
+    real(rp)::                              x
+    real(rp),dimension(:,:),allocatable::   bb
+    real(rp),dimension(:),allocatable::     ncVal,d
+    
+        n = this%truncod_
+        ncnp = this%ncnp_
+        allocate(ncVal(ncnp),bb(1,0:n),d(1))
+        
+        do i=1,ncnp
+            x = (i-1)*2._rp/(ncnp-1) - 1._rp
+            ncVal(i) = func(this%quadval(a,x), this%quadval(b,x))
+        enddo
+        
+        i = minloc(ncVal, 1)
+        x = (i-1)*2._rp/(ncnp-1) - 1._rp
+        bb(1,:) = this%quadval([0:n], x)
+        d = GlobalEps
+        
+        !solve min|c-ax| s.t. bx=d
+        call solvelinearleastsquare(this%NewtonCotesBasisVal_, bb, ncVal, d, o, i)
+        
+    end function op2_clsPositive
     
     
 end module polynomialSpace_
