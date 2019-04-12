@@ -7,8 +7,8 @@ implicit none
     !----------------------Global Accuracy control list----------------------
     integer,parameter ::            isp = selected_int_kind(9)
     integer,parameter ::            idp = selected_int_kind(13)
-    integer,parameter ::            rsp = selected_real_kind(p=6,r=37)
-    integer,parameter ::            rdp = selected_real_kind(p=15,r=307)
+    integer,parameter ::            rsp = selected_real_kind(p=6, r=37)
+    integer,parameter ::            rdp = selected_real_kind(p=15, r=307)
     integer,parameter::             ip  = isp
     integer,parameter::             rp  = rdp
     integer,parameter::             lp  = ip
@@ -17,10 +17,10 @@ implicit none
     
     !----------------------character control list----------------------
     !this is standard(like *) output of different types, as a reference here
-    character(10),parameter::       fmt_rdp  = '(E23.15E3)'
-    character(9),parameter::        fmt_rsp  = '(E13.6E2)'
-    character(5),parameter::        fmt_idp  = '(I20)'
-    character(5),parameter::        fmt_isp  = '(I11)'
+    character(10),parameter::       fmt_rdp  = '(e23.15e3)'
+    character(9),parameter::        fmt_rsp  = '(e13.6e2)'
+    character(5),parameter::        fmt_idp  = '(i20)'
+    character(5),parameter::        fmt_isp  = '(i11)'
     integer(ip),parameter::         lowercase_a = ichar('a')
     integer(ip),parameter::         lowercase_z = ichar('z')
     integer(ip),parameter::         uppercase_a = ichar('A')
@@ -133,19 +133,19 @@ contains
     !--positive integer mod 2
     elemental integer(ip) function pimod2(i)
     integer(ip),intent(in)::    i
-        pimod2 = ibits(i,0,1)
+        pimod2 = ibits(i, 0, 1)
     end function pimod2
     
     !positive integer divided by 2
     elemental integer(ip) function pidb2(i)
     integer(ip),intent(in)::    i
-        pidb2 = ishft(i,-1)
+        pidb2 = ishft(i, -1)
     end function pidb2
     
     !--
     elemental real(rp) function log2(a)
     real(rp),intent(in)::       a
-        log2 = log(a) / log(2._rp)
+        log2 = log(a)/log(2._rp)
     end function log2
     
     

@@ -32,6 +32,7 @@ implicit none
     public:: eigenSymTriDiagonal
     public:: inverseGeneralSquareMat
     public:: eigenTriDiagonal
+    public:: eigenValue
     !dir$ end if
     
     
@@ -44,6 +45,16 @@ implicit none
     
 contains
 
+    !generalized routine to solve eigenValue
+    pure subroutine eigenValue(a,ev)
+    real(rp),dimension(:,:),intent(inout):: a
+    complex(rp),dimension(:),intent(out)::  ev
+    real(rp),dimension(size(ev))::          ai, ar, beta
+    real(rp),dimension(size(ev),size(ev)):: u
+        u = unitary(size(ev))
+        call ggev(a, u, ar, ai, beta)
+        ev = cmplx(ar, ai)/beta
+    end subroutine eigenValue
     
     !solve the symmetry linear equations system by LU factorization
     pure subroutine solveSymmetryLES(a,b)

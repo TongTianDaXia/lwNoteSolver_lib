@@ -6,6 +6,7 @@ implicit none
     public:: GasChemReactKin
     public:: GasSpecies
     !--
+    public:: miu_mix
     
     !----------------------------------------------------------------
     type GasSpecies
@@ -16,7 +17,11 @@ implicit none
         real(rp)::                  Tc_         !criterion temperature for thermodynamic fit function
         real(rp)::                  mw_         ![g/mol]
         real(rp)::                  R_          !J/[K*g] = R_c / mw
-
+        
+        real(rp)::                  epsilonOverk_   !epsilon/k | k: boltzmann constant
+                                                    !epsilon: Lennard-Jones potential well depth
+        real(rp)::                  sigma_          !Lennard-Jones collision diameter
+        
     contains  
           
         generic::                   init    =>  init_n,     &
@@ -52,6 +57,9 @@ implicit none
         generic::                   S => EntropyNasa9_R, EntropyNasa9_Rc
         procedure::                 EntropyNasa9_R    !dimension same as R, if R[J/(K*g)], then output [J/g]
         procedure::                 EntropyNasa9_Rc   ![J/(K*mol)], R_c as the default R
+        
+        !miu[]
+        procedure::                 miu => viscosity_sp
         
     end type GasSpecies
     
@@ -145,21 +153,23 @@ contains
         this%ThermoCoef_ = 0._rp
         this%mw_ = 0._rp
         this%R_ = 0._rp
+        this%epsilonOverk_ = 0._rp
+        this%sigma_ = 0._rp
     end subroutine init_n
-    !--
-    pure subroutine init_spinfo(this,ThermoCoef,Tc,mw)
+    !--mw[g/mol]
+    pure subroutine init_spinfo(this, ThermoCoef, Tc, mw, epsilonOverk, sigma)
     class(GasSpecies),intent(out)::    this
     real(rp),dimension(:,:),intent(in)::ThermoCoef
-    real(rp),intent(in)::               Tc
-    real(rp),intent(in)::               mw
+    real(rp),intent(in)::               Tc, mw, epsilonOverk, sigma
         allocate(this%ThermoCoef_ , source = ThermoCoef)
         this%Tc_ = Tc
         this%mw_ = mw
         this%R_ = R_c/mw
+        this%epsilonOverk_ = epsilonOverk
+        this%sigma_ = sigma
     end subroutine init_spinfo
     
-    
-    
+
     !--------------------!
     elemental real(rp) function ThermoCoefL_i(this,i) result(c)
     class(GasSpecies),intent(in)::          this
@@ -268,45 +278,57 @@ contains
     
     !specific entropy polynomial fitting
     elemental real(rp) function EntropyNasa9_Rc(this,T) result(entropy)
-    class(GasSpecies),intent(in):: this
-    real(rp),intent(in)::               T
+    class(GasSpecies),intent(in)::  this
+    real(rp),intent(in)::           T
         entropy = this%S(T,R_c)
     end function EntropyNasa9_Rc
-!------------------------------------------------------------------------  
+    
+    
+    
+    !--refer to chemkin manual [pure species vicosity]
+    elemental real(rp) function viscosity_sp(this,T) result(miu)
+    class(GasSpecies),intent(in)::  this
+    real(rp),intent(in)::           T
+    real(rp)::                      omega, a
+    
+        !refer to [a fortran computer code package for the evaluation of gas-phase, multicomponent transport properties]
+        a = T/this%epsilonOverk_
+        omega = 1.147_rp*a**(-0.145_rp) + (a + 0.5)**(-2)
+    
+        !miu = (5/16)[sqrt(pi*m*k*T)/pi/sigma**2/omega]
+        miu = 2.6693e-6_rp*(sqrt(this%mw_*T)/this%sigma_**2/omega)
+
+    end function viscosity_sp
+    !------------------------------------------------------------------------  
     
     
 !gas chem reaction model 
 !-------------------------------------------------------------------------
-    pure subroutine init_sp(this,sp)
-    class(GasChemReactKin),intent(out)::          this
-    type(GasSpecies),dimension(:),intent(in):: sp
-        allocate(this%species_,source=sp)
+    pure subroutine init_sp(this, sp)
+    class(GasChemReactKin),intent(out)::        this
+    type(GasSpecies),dimension(:),intent(in)::  sp
+        allocate(this%species_, source=sp)
     end subroutine init_sp
     
-    pure subroutine init_spReact(this,ThermoCoefsp,Tc,mw,sm,arns,threebody,arnsb)
+    pure subroutine init_spReact(this, sp, sm, arns, threebody, arnsb)
     class(GasChemReactKin),intent(out)::        this
+    type(GasSpecies),dimension(:),intent(in)::  sp
     integer(ip),dimension(:,:,:),intent(in)::   sm
-    real(rp),dimension(:,:,:),intent(in)::      ThermoCoefsp
     real(rp),dimension(:,:),intent(in)::        threebody,arns
-    real(rp),dimension(:),intent(in)::          Tc,mw
     real(rp),dimension(:,:),optional,intent(in)::arnsb
     integer(ip)::                               i,ns,nr
     
-        ns = size(mw)
+        ns = size(sp)
         nr = size(arns,2)
         
         this%ns_ = ns
         this%nr_ = nr
         
-        allocate(this%species_(ns))
-        do i=1,ns
-            call this%species_(i)%init(ThermoCoefsp(:,:,i),Tc(i),mw(i))
-        enddo
-        
-        allocate(this%stoichiometric_ , source = sm)
-        allocate(this%threebody_ , source = threebody)
-        allocate(this%arns_ , source = arns)
-        if(present(arnsb)) allocate(this%arnsRev_ , source = arnsb)
+        allocate(this%species_, source=sp)
+        allocate(this%stoichiometric_, source=sm)
+        allocate(this%threebody_, source=threebody)
+        allocate(this%arns_, source=arns)
+        if(present(arnsb)) allocate(this%arnsRev_, source=arnsb)
         
     end subroutine init_spReact
     
@@ -388,7 +410,7 @@ contains
     integer(ip)::                               i
     
         do i=1,size(progRate1)  !nr
-            progRate1(i) = k(i) * product(molcon**sm(i,:))
+            progRate1(i) = k(i)*product(molcon**sm(i,:))
         enddo
         
     end function ProgRate1
@@ -435,12 +457,12 @@ contains
     real(rp),dimension(size(ThreeBody,1))::     TbCon
     integer(ip)::                               re,nr
         
-        nr = size(ThreeBody,1)
+        nr = size(ThreeBody, 1)
         do re =1,nr
             if(abs(sum(ThreeBody(re,:))) < Globaleps) then
                 TbCon(re) = 1._rp !not three body reaction
             else
-                TbCon(re) = sum(ThreeBody(re,:) * MolCon)
+                TbCon(re) = sum(ThreeBody(re,:)*MolCon)
             endif
         end do
           
@@ -565,5 +587,32 @@ contains
     class(GasChemReactKin),intent(in)::   this
         nr = this%nr_
     end function nr
+    
+    
+!---------------------------------
+    pure real(rp) function miu_mix(sp,molfrac,T) result(miu)
+    type(GasSpecies),dimension(:),intent(in)::  sp
+    real(rp),dimension(:),intent(in)::          molfrac
+    real(rp),intent(in)::                       T
+    integer(ip)::                               i,j,ns
+    real(rp),dimension(size(sp),size(sp))::     phi
+    real(rp),dimension(size(sp))::              miuk
+    
+        miuk = sp%miu(T)
+        ns = size(sp)
+        
+        do i=1,ns
+            do j=1,ns
+                phi(i,j) = (1._rp + sqrt(miuk(i)/miuk(j))*(sp(j)%mw_/sp(i)%mw_)**0.25_rp)**2
+                phi(i,j) = phi(i,j)/sqrt(8._rp*(1._rp + sp(i)%mw_/sp(j)%mw_))
+            enddo
+        enddo
+        
+        miu = 0._rp
+        do i=1,ns
+            miu = miu + molfrac(i)*miuk(i)/sum(molfrac*phi(i,:))
+        enddo
+        
+    end function miu_mix
     
 end module GasChemReactKin_

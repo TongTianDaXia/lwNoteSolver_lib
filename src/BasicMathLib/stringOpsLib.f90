@@ -5,7 +5,8 @@ implicit none
     private
     !--
     public:: readKeyVal
-    public:: countsubstring,lowerString,upperString,bondString
+    public:: countsubstring, lowerString, upperString, bondString
+    public:: i2c
     
     
     !--------------------------------------------------
@@ -204,5 +205,41 @@ contains
         enddo
         
     end subroutine readKeyVal_integer2rank
+    
+    
+    !--
+    character(20) function i2c(i)
+    integer(ip),intent(in)::    i
+    integer(ip)::               absi, maxExp, pos, p, k
+    character(5)::              fmt
+        
+        !Refer to max number of integer. it can't denot number above 1e**(maxExp+1)
+        if(ip==4) then
+            maxExp = 9
+        elseif(ip==8) then
+            maxExp = 18
+        else
+            stop 'error: stringOpsLib/i2c function reject integer precision'
+        endif
+        
+        absi = abs(i)
+        pos = 1
+        do k=1,maxExp
+            pos = pos*10
+            if(absi<pos) then
+                p = k
+                if(i<0) p = p + 1
+                if(p<10) then
+                    write(fmt, '("(i",i1,")")') p
+                else
+                    write(fmt, '("(i",i2,")")') p
+                endif
+                exit
+            endif
+        enddo
+        
+        write(i2c,trim(fmt)) i
+    
+    end function i2c
 
 end module stringOpsLib

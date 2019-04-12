@@ -196,7 +196,7 @@ contains
     elemental real(rp) function funcval(this,x) result(y)
     class(polynomial),intent(in)::  this
     real(rp),intent(in)::           x
-        y = polyval(this%coef_,x)
+        y = polyval(this%coef_, x)
     end function funcval
     
     !--

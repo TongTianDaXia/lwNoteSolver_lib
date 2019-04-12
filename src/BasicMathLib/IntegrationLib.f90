@@ -43,10 +43,8 @@ implicit none
         procedure:: GaussHermitePhys
     end interface
     
-
 contains
     
-
     !-------------------------------------------------------------------------
     pure function integrateTrapezoid_f1(func,lo,up,epsilon) result(integral)
     procedure(absf1)::                      func
@@ -62,7 +60,7 @@ contains
         integral = trapInt()
         do while(epsrun>max(integral*eps,eps).and.n<1e9)
             integral0   = integral
-            n           = n * 1.618d0     !golden
+            n           = n*1.618_rp      !golden
             integral    = trapInt()
             epsrun      = abs(integral-integral0)
         enddo
@@ -82,7 +80,7 @@ contains
                 x   = lo + i*dx
                 y0  = y1
                 y1  = func(x)
-                trapInt = trapInt + 0.5d0*(y0+y1)*dx
+                trapInt = trapInt + 0.5_rp*(y0+y1)*dx
             enddo
             
         end function trapInt
@@ -109,15 +107,15 @@ contains
     real(rp),intent(in)::       lo,flo,up,fup,s,eps
     integer(ip),intent(in)::    max
     real(rp)::                  mi,fmi,l,r
-        mi  = (lo+up)/2.d0
+        mi  = (lo+up)/2._rp
         fmi = f(mi)
         l   = simpson_f1(f,lo,flo,mi,fmi)
         r   = simpson_f1(f,mi,fmi,up,fup)
-        if(max==0.or.abs(l+r-s)<=15.d0*eps) then   !15.d0 comes from error analysis
-            integral = l+r+(l+r-s)/15.d0
+        if(max==0.or.abs(l+r-s)<=15._rp*eps) then   !15._rp comes from error analysis
+            integral = l+r+(l+r-s)/15._rp
         else
-            integral = integrateAdaptiveSimpson_f1_rcs(f,lo,flo,mi,fmi,l,eps/2.d0,max-1)+ &
-                        integrateAdaptiveSimpson_f1_rcs(f,mi,fmi,up,fup,r,eps/2.d0,max-1)
+            integral = integrateAdaptiveSimpson_f1_rcs(f,lo,flo,mi,fmi,l,eps/2._rp,max-1)+ &
+                        integrateAdaptiveSimpson_f1_rcs(f,mi,fmi,up,fup,r,eps/2._rp,max-1)
         endif
     end function integrateAdaptiveSimpson_f1_rcs
 
@@ -126,8 +124,8 @@ contains
     procedure(absf1)::          f
     real(rp),intent(in)::       lo,up,flo,fup
     real(rp)::                  r,mi
-        mi = lo + (up-lo)/2.d0
-        r = ( flo + 4.d0*f(mi) + fup ) * (up-lo) / 6.d0
+        mi = lo + (up-lo)/2._rp
+        r = (flo + 4._rp*f(mi) + fup)*(up-lo)/6._rp
     end function simpson_f1
     
     
@@ -147,7 +145,7 @@ contains
         quadx = alpha
         quadw(1:n-1) = sqrt(beta(2:n))  !temp for edge
         call eigenSymTriDiagonal(quadx,quadw,ev)
-        quadw = beta(1) * ev(1,:)**2
+        quadw = beta(1)*ev(1,:)**2
     
     end subroutine GaussCev
     
@@ -158,7 +156,7 @@ contains
     integer(ip)::                       i,j,k,l,m,m2,mml
     real(rp)::                          b,c,f,g,p,r,s
     real(rp),dimension(size(quadx))::   e
-    real(rp),parameter::                eps = 10._rp * GlobalEps
+    real(rp),parameter::                eps = 10._rp*GlobalEps
     integer(ip)::                       n
     
         n = size(quadx)
@@ -238,7 +236,7 @@ contains
                 call swap(quadw(i),quadw(k+i-1))
             endif
         enddo
-        quadw(1:n) = beta(1) * quadw(1:n)**2
+        quadw(1:n) = beta(1)*quadw(1:n)**2
     
     end subroutine GaussTom
     
@@ -252,7 +250,7 @@ contains
     real(rp),dimension(ishft(Order,-1)+1):: x,w
     
         call QuadratureRule(ruleType,x,w)
-        r = merge(normalCoef,1._rp,present(normalCoef)) * sum(f(x)*w)
+        r = merge(normalCoef, 1._rp, present(normalCoef))*sum(f(x)*w)
         
     end function integrateQuadratureRule
     
@@ -283,7 +281,7 @@ contains
     
     !refer to https://github.com/chebfun/chebfun/blob/34f92d12ca51003f5c0033bbeb4ff57ac9c84e78/legpts.m
     !maybe a better choice https://github.com/Pazus/Legendre-Gauss-Quadrature/blob/master/legzo.m
-    !calculate \[ \int_{-1}^{1} f(x) dx \],(refer to wiki, \pi(x)=1 rather than \pi(x)=\frac{1}{2})
+    !calculate \[\int_{-1}^{1} f(x) dx\],(refer to wiki, \pi(x)=1 rather than \pi(x)=\frac{1}{2})
     !asymptotic method unavailiable temporarily
     !n points reach 2n-1 order accuracy | N+1 points reach 2N+1 order accuracy
     pure subroutine GaussLegendre(quadx,quadw)
@@ -419,11 +417,11 @@ contains
     
     !------------------------------------------------------------------------------------
     !refer to https://github.com/chebfun/chebfun/blob/development/hermpts.m
-    !calculate \[ \int_{-inf}^{inf} f(x) exp(-x^2) dx \],(refer to wiki)
+    !calculate \[\int_{-inf}^{inf} f(x) exp(-x^2) dx\],(refer to wiki)
     !hermite asymptotic method unavailiable temporarily
     !GaussHermite returns hermite points and gauss-hermite quadrature weights.
     !by default these are roots of the 'physicist'-type hermite polynomials, which are orthogonal with respect to the weight exp(-x.^2).\
-    !if(var=='prob'), it calculate \[ \int_{-inf}^{inf} f(x) exp(-x^2/2) dx \]
+    !if(var=='prob'), it calculate \[\int_{-inf}^{inf} f(x) exp(-x^2/2) dx\]
     !------------------------------------------------------------------------------------
     pure subroutine GaussHermitePhys(quadx,quadw,var)
     real(rp),dimension(:),intent(out)::     quadx,quadw
@@ -830,9 +828,9 @@ contains
     pure subroutine GaussHermiteProb(quadx,quadw)
     real(rp),dimension(:),intent(out):: quadx,quadw
    
-            call GaussHermitePhys(quadx,quadw)
-            quadx = quadx*sqrt(2._rp)
-            quadw = quadw*sqrt(2._rp)
+        call GaussHermitePhys(quadx,quadw)
+        quadx = quadx*sqrt(2._rp)
+        quadw = quadw*sqrt(2._rp)
        
     end subroutine GaussHermiteProb
     
@@ -1089,17 +1087,15 @@ contains
         if(rule=='gausslegendre')   rule = 'gl'
         !--------------------------------
         
-        dimSparseGrid = size(cubx,dim=1)
-        npSparseGrid= size(cubx,dim=2)
+        dimSparseGrid = size(cubx, 1)
+        npSparseGrid= size(cubx, 2)
         
         if(rule == 'cc') then
             !--close fully nested
             call ClosefullyNest(dimSparseGrid,level,npSparseGrid, cubx,cubw)
-            !--
         elseif(rule == 'gh'.or. rule == 'gl') then
             !--open weakly nested, only nest the middle point
             call OpenWeaklyNest(dimSparseGrid,level,npSparseGrid, rule(1:2), cubx,cubw)
-            !--
         else
             call disableprogram
         endif

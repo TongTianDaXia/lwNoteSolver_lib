@@ -10,7 +10,7 @@ implicit none
     
     !--operation based on the array
     public:: magSqr, mag, angle, normalize, para, orth, rot2, rot2deg, norm, polyval
-    public:: trace, diag, sort, cumprod, trans, repmat, bondcol, bondrow
+    public:: trace, diag, unitary, sort, cumprod, trans, repmat, bondcol, bondrow
     
     !--indice ops
     public:: compositionNext,combinationNext,colexNext
@@ -279,6 +279,18 @@ contains
     integer(ip)::                           i
         forall(i=1:size(diagExtractElement)) diagExtractElement(i)=m(i,i)
     end function diagExtractElement
+    
+    
+    !--create unitary matrix
+    pure function unitary(n)
+    integer(ip),intent(in)::    n
+    real(rp),dimension(n,n)::   unitary
+    integer(ip)::               i
+        unitary = zero
+        do i=1,n
+            unitary(i,i) = 1._rp
+        enddo
+    end function unitary
     
     !----
     pure real(rp) function trace(m)
