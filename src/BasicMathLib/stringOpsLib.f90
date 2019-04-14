@@ -6,7 +6,7 @@ implicit none
     !--
     public:: readKeyVal
     public:: countsubstring, lowerString, upperString, bondString
-    public:: i2c
+    public:: i2s
     
     
     !--------------------------------------------------
@@ -208,7 +208,7 @@ contains
     
     
     !--
-    character(20) function i2c(i)
+    character(20) function i2s(i)
     integer(ip),intent(in)::    i
     integer(ip)::               absi, maxExp, pos, p, k
     character(5)::              fmt
@@ -219,7 +219,7 @@ contains
         elseif(ip==8) then
             maxExp = 18
         else
-            stop 'error: stringOpsLib/i2c function reject integer precision'
+            stop 'error: stringOpsLib/i2s function reject integer precision'
         endif
         
         absi = abs(i)
@@ -235,11 +235,16 @@ contains
                     write(fmt, '("(i",i2,")")') p
                 endif
                 exit
+            elseif(k==maxExp) then
+                p = k
+                if(i<0) p = p + 1
+                !p \in [10, 20] under this condition
+                write(fmt, '("(i",i2,")")') p
             endif
         enddo
         
-        write(i2c,trim(fmt)) i
+        write(i2s, trim(fmt)) i
     
-    end function i2c
+    end function i2s
 
 end module stringOpsLib
