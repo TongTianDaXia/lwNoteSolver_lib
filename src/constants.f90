@@ -34,8 +34,8 @@ implicit none
     real(rp),parameter::            pi2     = pi**2
     real(rp),parameter::            e       = exp(1._rp)
     real(rp),parameter::            k_b     = 1.38067852e-23_rp !boltzmann constant
-    real(rp),parameter::            R_c     = 8.3144598_rp      !gas constant   ( J * [K^-1] * [mol^-1] )
-    real(rp),parameter::            R_air   = 287.058_rp        !specific gas constant for ideal gas ( J * [kg^-1] * [mol^-1] )
+    real(rp),parameter::            R_c     = 8.3144598_rp      !gas constant   (J*[K^-1]*[mol^-1])
+    real(rp),parameter::            R_air   = 287.058_rp        !specific gas constant for ideal gas (J*[kg^-1]*[mol^-1])
     real(rp),parameter::            gm_diatomic = 1.4_rp        !specific gas
     real(rp),parameter::            P_atm   = 101325._rp        !pressure at one atmosphere
     
@@ -241,6 +241,7 @@ contains
         
         open(unit=99, file=trim(fn)//'.dat')
         write(99,*) 'variables=x,'//trim(fn)
+        write(99,*) 'zone T='//trim(fn)
         do i=1,np
             x = lo + (i-1)*dx
             write(99,*) x, func(x)

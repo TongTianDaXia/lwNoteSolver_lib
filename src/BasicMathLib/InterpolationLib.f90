@@ -14,7 +14,7 @@ implicit none
     public:: exRctr3
     public:: muscl2, minmod, vanLeer, vanAlbada, superbee
     public:: muscl2c, muscl2c_sp, muscl2c_spstd
-    public:: weno5z
+    public:: weno5, weno5z
     
     !----------------------------------------------------
     !enum of limiter |abondon doubleminmod due to its asymmetry
@@ -72,12 +72,16 @@ implicit none
         procedure muscl2c_SpOrnoStd
     end interface muscl2c_spstd
         
-    interface weno5z
-        !(p(1)--1--p(2)--1--p(3)--1/2--x--1/2--p(4)--1--p(5))
+    !(p(1)--1--p(2)--1--p(3)--1/2--x--1/2--p(4)--1--p(5))
+    interface weno5
+        procedure:: weno5_scalar
+        procedure:: weno5_array
+    end interface weno5
+    
+    interface weno5z    
         procedure:: weno5z_scalar
         procedure:: weno5z_array
     end interface weno5z
-    
     
 contains
     
@@ -248,19 +252,15 @@ contains
     real(rp),dimension(size(f,1))::             x,r,beta
     real(rp),dimension(size(f,1),3)::           delta
     integer(ip)::                               loc
-        delta(:,1) = f(:,2) - f(:,1)
-        delta(:,2) = f(:,3) - f(:,2)
+        delta(:,1) = (f(:,2) - f(:,1))*theta
+        delta(:,2) = (f(:,3) - f(:,2))*theta
         delta(:,3) = (f(:,3) - f(:,1))/2._rp
         !functional approah 1. check direction; 2. check variation
-        if((delta(:,1) .ip. delta(:,2)) <= GlobalEps) then
+        if((delta(:,1) .ip. delta(:,2)) < GlobalEps) then
             x(:) = f(:,2)
         else
-            loc = minloc([theta*norm2(delta(:,1)), theta*norm2(delta(:,2)), norm2(delta(:,3))], 1)
-            if(loc==3) then
-                x(:) = f(:,2) + 0.5_rp*delta(:,loc)
-            else
-                x(:) = f(:,2) + 0.5_rp*delta(:,loc)*theta
-            endif
+            loc = minloc([norm2(delta(:,1)), norm2(delta(:,2)), norm2(delta(:,3))], 1)
+            x(:) = f(:,2) + 0.5_rp*delta(:,loc)
         endif
     end function muscl2c_SpOrnoCoefs
     !--
@@ -315,8 +315,49 @@ contains
     end function LsRctr3
     
     !---------
+    !refer to <High Order Weighted Essentially Nonoscillatory Schemes for Convection Dominated Problems>
+    pure function weno5_scalar(f) result(x)
+    real(rp),dimension(:),intent(in)::f
+    real(rp)::              x,s0,s1,s2,w0,w1,w2,w
+    real(rp),parameter::    eps = 1.e-40_rp
+    integer(ip),parameter:: p = 2
+    real(rp),parameter::    alpha1 = 0.25_rp, alpha2 = 13._rp/12._rp
+    
+        !nonlinear indicator of smoothness
+        s0 = alpha1*(f(1) - 4._rp*f(2) + 3._rp*f(3))**2 &
+           + alpha2*(f(1) - 2._rp*f(2) + f(3))**2
+                                
+        s1 = alpha1*(f(2) - f(4))**2 &
+           + alpha2*(f(2) - 2._rp*f(3) + f(4))**2
+
+        s2 = alpha1*(3._rp*f(3) - 4._rp*f(4) + f(5))**2 &
+           + alpha2*(f(3) - 2._rp*f(4) + f(5))**2
+
+        !the coefficients for the 5th order Rctr from 3th order Rctr
+        w0 = 0.1_rp/(s0+eps)**p
+        w1 = 0.6_rp/(s1+eps)**p
+        w2 = 0.3_rp/(s2+eps)**p
+        
+        w = w0 + w1 + w2
+        w0 = w0/w
+        w1 = w1/w
+        w2 = w2/w
+
+        x = w0*exRctr3(f(1:3)) + w1*RsRctr3(f(2:4)) + w2*LsRctr3(f(3:5))
+
+    end function weno5_scalar
+    
+    !--dim(f,1) is field dimension and dim(f,2) is the node index
+    pure function weno5_array(f) result(x)
+    real(rp),dimension(:,:),intent(in)::f
+    real(rp),dimension(size(f,1))::     x
+    integer(ip)::                       i
+        forall(i=1:size(f,1)) x(i) = weno5(f(i,:))
+    end function weno5_array
+    
+    !refer to <An improved weighted essentially non-oscillatory scheme for hyperbolic conservation laws>
     !refer to <jcp - An improved WENO-Z scheme>
-    !refer to <High OrderWeighted Essentially Nonoscillatory Schemes for Convection Dominated Problems>
+    
     pure function weno5z_scalar(f) result(x)
     real(rp),dimension(:),intent(in)::f
     real(rp)::              x,s0,s1,s2,w0,w1,w2,w
@@ -355,5 +396,5 @@ contains
     integer(ip)::                       i
         forall(i=1:size(f,1)) x(i) = weno5z(f(i,:))
     end function weno5z_array
-    
+
 end module interpolationLib

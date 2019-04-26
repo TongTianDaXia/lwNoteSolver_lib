@@ -30,6 +30,7 @@ implicit none
         integer(ip)::                               quadnp_
         integer(ip)::                               truncOd_
         
+        !--
         type(polynomial),dimension(:),allocatable:: basis_
         character(10)::                             basisType_
         !the innerproduct of the space is based on the quadrature rule
@@ -41,6 +42,9 @@ implicit none
         real(rp),dimension(:,:),allocatable::       quadBasisVal_
         real(rp),dimension(:),allocatable::         quadx_
         real(rp),dimension(:),allocatable::         quadw_
+        
+        !--A a = funcval(x_gp) | A = trans(quadBasisVal_)
+        real(rp),dimension(:,:),allocatable::       ata_
         
         !use tribasis quadrature value for multiplication and division
         !triMat_{ijk} = \int \phi_i \phi_j \phi_k d(P(\xi))
@@ -238,6 +242,9 @@ contains
             enddo
         enddo
         
+        !--A = trans(quadBasisVal_)
+        allocate(this%ata_, source = this%quadBasisVal_.ip.trans(this%quadBasisVal_))
+        
         !tribasis method is more robust for multiplication and division than quadrature method
         allocate(this%triMat_(0:od, 0:od, 0:od))
         do k=0,od
@@ -373,12 +380,13 @@ contains
         q = this%quadnp_
         allocate(dmat(n,n), d(n), amat(n,q), b(q))
         
-        !A(q,n)x(n)-b(q) | quandbasisval_(0:so,1:np) | n=so+1, q=np
+        !min( |A[q,n]a[n] - b[q]|_2 ) | quandbasisval_(0:so,1:np) | n=so+1, q=np
         !A = trans(this%quadBasisVal_)
-        !D = A^T A; d^T = b^T A
-        dmat(:,:) = this%quadBasisVal_ .ip. trans(this%quadBasisVal_)
-        d(:) = trans(this%quadBasisVal_) .ip. a .ip. trans(this%quadBasisVal_)
-        
+        !D = A^T A | this%quadBasisVal_ .ip. trans(this%quadBasisVal_)
+        dmat(:,:) = this%ata_
+        !d^T = b^T A = (A a)^T A = a A^T A
+        d(:) = a .ip. this%ata_
+        !--
         amat(:,:) = this%quadBasisVal_
         b(:) = GlobalEps*a(0)
         
@@ -441,7 +449,8 @@ contains
                 mat(i,j) = sum(down(:)*this%triMat_([0:this%truncOd_], j, i))
             enddo
         enddo
-        dv = up; call solveGeneralLES(mat,dv)
+        dv = up
+        call solveGeneralLES(mat, dv)
     end function dv
     
     !--unitary operation o_k = \int func(u) \phi_k dp(\xi) = \sum func(\xi_i) \phi_k(\xi_i) w(i)
