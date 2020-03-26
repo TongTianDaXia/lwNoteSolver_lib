@@ -180,18 +180,22 @@ contains
     !Lp norm
     pure real(rp) function norm(v,p)
     real(rp),dimension(:),intent(in)::  v
-    integer(ip),intent(in)::            p
+    integer(ip),optional,intent(in)::   p
     integer(ip)::                       i
-        if(p==2) then
-            norm = norm2(v)
-        elseif(p==1) then
-            norm = sum(abs(v))
-        elseif(p==0) then
-            norm = count(v /= [(0._rp,i=1,size(v))])
-        elseif(p>2) then
-            norm = sum(abs(v)**p)**(1._rp/p)
+        if(present(p)) then
+            if(p==2) then
+                norm = norm2(v)
+            elseif(p==1) then
+                norm = sum(abs(v))
+            elseif(p==0) then
+                norm = count(v/=[(zero, i=1,size(v))])
+            elseif(p>2) then
+                norm = sum(abs(v)**p)**(1._rp/p)
+            else
+                norm = maxval(abs(v))
+            endif
         else
-            norm = maxval(abs(v))
+            norm = norm2(v)
         endif
     end function norm
     
@@ -659,8 +663,8 @@ contains
     
     !--
     pure function mminnerproduct(lhs,rhs) result(p)
-    real(rp),dimension(:,:),intent(in)::lhs,rhs
-    real(rp),dimension(size(lhs,dim=1),size(rhs,dim=2))::p
+    real(rp),dimension(:,:),intent(in)::			lhs,rhs
+    real(rp),dimension(size(lhs,1),size(rhs,2))::	p
         p = matmul(lhs,rhs)
     end function mminnerproduct
     
@@ -668,7 +672,7 @@ contains
     pure function mvinnerproduct(lhs,rhs) result(p)
     real(rp),dimension(:,:),intent(in)::lhs
     real(rp),dimension(:),intent(in)::  rhs
-    real(rp),dimension(size(lhs,dim=1))::p
+    real(rp),dimension(size(lhs,1))::	p
         p = matmul(lhs,rhs)
     end function mvinnerproduct
     
@@ -679,7 +683,6 @@ contains
     real(rp),dimension(size(rhs,dim=2))::p
         p = matmul(lhs,rhs)
     end function vminnerproduct
-    
     
     
     !---outer product
@@ -699,19 +702,18 @@ contains
     pure function vvcrossproduct3(lhs,rhs) result(p)
     real(rp),dimension(3),intent(in)::  lhs,rhs
     real(rp),dimension(3)::             p
-        p(1)  =   lhs(2) * rhs(3)   -   lhs(3) * rhs(2)
-        p(2)  =   lhs(3) * rhs(1)   -   lhs(1) * rhs(3)
-        p(3)  =   lhs(1) * rhs(2)   -   lhs(2) * rhs(1)
+        p(1) = lhs(2)*rhs(3) - lhs(3)*rhs(2)
+        p(2) = lhs(3)*rhs(1) - lhs(1)*rhs(3)
+        p(3) = lhs(1)*rhs(2) - lhs(2)*rhs(1)
     end function vvcrossproduct3
     
     pure real(rp) function vvcrossproduct2(lhs,rhs) result(p)
     real(rp),dimension(2),intent(in)::  lhs,rhs
-        p = lhs(1) * rhs(2) - lhs(2) * rhs(1)
+        p = lhs(1)*rhs(2) - lhs(2)*rhs(1)
     end function vvcrossproduct2
     
     
     !some special plus
-    !--
     pure function mvplus(lhs,rhs) result(m)
     real(rp),dimension(:,:),intent(in)::lhs
     real(rp),dimension(:),intent(in)::  rhs

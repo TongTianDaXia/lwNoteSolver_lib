@@ -11,10 +11,11 @@ implicit none
     type::  listlist
     
         private
-        type(list),allocatable,dimension(:)::   ls
+        type(list),dimension(:),allocatable::	ls
         
     contains
-        !constructor
+	
+        !init
         generic::       init    =>  init_n,     &
                                     init_size,  &
                                     init_sizeval
@@ -51,6 +52,7 @@ implicit none
         
         !--
         procedure::     adjust
+		
         !--
         procedure::     multiInverse
         
@@ -59,121 +61,143 @@ implicit none
         
     end type listlist
     
-!----------------------------
+
 contains
 
     subroutine init_n(this,lsize,nlist)
     class(listlist),intent(out)::   this
     integer(ip),intent(in)::        lsize,nlist
     integer(ip)::                   i
+	
         allocate(this%ls(nlist))
         do i = 1,nlist
             call this%ls(i)%init(lsize)
         enddo
+		
     end subroutine init_n
+	
     !--
     subroutine init_size(this,sizes)
-    class(listlist),intent(out)::   this
-    integer(ip),dimension(:),intent(in)::sizes
-    integer(ip)::                   i
+    class(listlist),intent(out)::			this
+    integer(ip),dimension(:),intent(in)::	sizes
+    integer(ip)::							i
+	
         allocate(this%ls(size(sizes)))
         do i = 1,size(sizes)
             call this%ls(i)%init(sizes(i))
         enddo
+		
     end subroutine init_size
+	
     !--
     subroutine init_sizeVal(this,sizes,vals)
-    class(listlist),intent(out)::   this
-    integer(ip),dimension(:),intent(in)::sizes,vals
-    integer(ip)::                   i,disp
+    class(listlist),intent(out)::			this
+    integer(ip),dimension(:),intent(in)::	sizes,vals
+    integer(ip)::							i,disp
+	
         allocate(this%ls(size(sizes)))
         disp = 0
         do i = 1,size(sizes)
             call this%ls(i)%init(vals(disp + 1 : disp+sizes(i)))
             disp = disp + sizes(i)
         enddo
+		
     end subroutine init_sizeVal
     
-    
-    !-------------
+    !--
     subroutine init_movealloc(this,lsls)
     class(listlist),intent(out)::   this
     class(listlist),intent(inout):: lsls
     integer(ip)::                   i,n
+	
         n = lsls%lsize()
         allocate(this%ls(n))
         do i=1,n
-            call this%ls(i)%init_movealloc( lsls%ls(i) )
+            call this%ls(i)%init_movealloc(lsls%ls(i))
         enddo
+		
     end subroutine init_movealloc
 
-    
-    !---
-    elemental subroutine sval_val(this,n,m,val)
+    !--
+    elemental subroutine sval_val(this, i, j, val)
     class(listlist),intent(inout):: this
-    integer(ip),intent(in)::        n,m,val
-        call this%ls(m)%sval(n,val)
+    integer(ip),intent(in)::        i, j, val
+	
+        call this%ls(j)%sval(i, val)
+		
     end subroutine sval_val
-    
+	
+	!--
     pure subroutine sval_vals(this,n,vals)
     class(listlist),intent(inout)::      this
     integer(ip),intent(in)::             n
     integer(ip),dimension(:),intent(in)::vals
+	
         call this%ls(n)%sval(vals)
+		
     end subroutine sval_vals
     
-    !---
+    !--
     elemental function val_ij(this,i,j)
     class(listlist),intent(in)::    this
     integer(ip),intent(in)::        i,j
     integer(ip)::                   val_ij
+	
         val_ij = this%ls(j)%val(i)
+		
     end function val_ij
     
-    !
+    !--
     function ptr_i(this,i) result(ls)
-    class(listlist),intent(in),target::this
-    integer(ip),intent(in)::        i
-    type(list),pointer::            ls
+    class(listlist),intent(in),target::	this
+    integer(ip),intent(in)::			i
+    type(list),pointer::				ls
+	
         ls => this%ls(i)
+		
     end function ptr_i
     
-    !----
+    !--
     elemental function nlist(this) result(n)
-    class(listlist),intent(in)::    this
-    integer(ip)::                   n
+    class(listlist),intent(in)::		this
+    integer(ip)::						n
+	
         n = size(this%ls)
+		
     end function nlist
     
-    !
+    !--
     elemental function lsize_i(this,i) result(n)
-    class(listlist),intent(in)::            this
-    integer(ip),intent(in)::                i
-    integer(ip)::                           n
+    class(listlist),intent(in)::        this
+    integer(ip),intent(in)::            i
+    integer(ip)::                       n
+	
         n =  this%ls(i)%lsize()
+		
     end function lsize_i
     
-
     !--
     pure integer(ip) function element_max_i(this) result(m)
     class(listlist),intent(in)::            this
     integer(ip)::                           i
+	
         m = minisp
         do i=1,this%lsize()
             m = max(m,this%ls(i)%lmax())
         enddo
+		
     end function element_max_i
     
-        
-    !-----------
+    !--
     pure subroutine adjust(this,sizes)
     class(listlist),intent(inout)::         this
     integer(ip),dimension(:),intent(in)::   sizes
+	
         call this%ls%adjust(sizes)
+		
     end subroutine adjust
     
-    
-    !----
+    !--
     subroutine multiInverse(this,inv_n,inv)
     class(listlist),intent(in)::    this
     integer(ip),intent(in)::        inv_n
@@ -209,6 +233,7 @@ contains
     subroutine prints(this)
     class(listlist),intent(in)::    this
     integer(ip)                     i
+	
         print*, 'listlistprint Starts'
         print*, 'nlist:',size(this%ls)
         print*, '-------------------------------'
@@ -219,6 +244,7 @@ contains
         enddo
         print*, '-------------------------------'
         print*, 'listlistprint Ends'
+		
     end subroutine prints
     
 end module listlist_

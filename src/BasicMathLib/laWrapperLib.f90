@@ -2,7 +2,7 @@
 !recursive communication interface for iterative sparse solver
 include 'mkl_rci.f90'
 !dir$ end if
-    
+
 module laWrapperLib
 use constants
 use arrayOpsLib
@@ -13,7 +13,7 @@ use mkl_rci
 implicit none
 
     private
-    
+
     !have emergency solver
     public:: solveGeneralLES
     public:: solveTridiagonalLES
@@ -23,7 +23,7 @@ implicit none
     public:: csrAx
     public:: fgmres
     public:: fgmresILUT
-    
+
     !rely on the lapack
     !dir$ if .not. defined(noMKL)
     public:: choleskyFactorSym
@@ -34,15 +34,15 @@ implicit none
     public:: eigenTriDiagonal
     public:: eigenValue
     !dir$ end if
-    
-    
-!--------------------------------------------------------
+
+
+	!--------------------------------------------------------
     interface solveLinearLeastSquare
         procedure:: solveLinearLeastSquare_1rhs
         procedure:: solveLinearLeastSquare_nrhs
         procedure:: solveLinearLeastSquare_Constrain
     end interface solveLinearLeastSquare
-    
+
 contains
 
     !generalized routine to solve eigenValue
@@ -55,7 +55,7 @@ contains
         call ggev(a, u, ar, ai, beta)
         ev = cmplx(ar, ai)/beta
     end subroutine eigenValue
-    
+
     !solve the symmetry linear equations system by LU factorization
     pure subroutine solveSymmetryLES(a,b)
     real(rp),dimension(1:,1:),intent(inout)::   a
@@ -66,8 +66,8 @@ contains
         call sytrf(a,ipiv=ipiv)
         call sytrs(a,b,ipiv)
     end subroutine solveSymmetryLES
-    
-    
+
+
     ![d] is the diagonal vector with size(n)
     ![eva] input sub_diagonal in beginning n-1 position and output n eigenvalues
     ![evc] output n*n orthonomal eigenvector
@@ -82,8 +82,8 @@ contains
             call stev(d,eva)
         endif
     end subroutine eigenSymTriDiagonal
-    
-    
+
+
     !call steqr(d,e,z,compz,info)
     ![d]    input the diagonal vector with size(n) and output the n eigenvalues in ascending order
     ![e]    input contains the off-diagonal elements of T with size(n-1)
@@ -99,8 +99,8 @@ contains
             call steqr(d,e)
         endif
     end subroutine eigenTriDiagonal
-    
-    
+
+
     !dir$ if defined (noMKL)
     !because triFacotrSquareMat may lead U be singluar, this procedure may fails
     pure subroutine solveGeneralLES(a,b)
@@ -113,12 +113,12 @@ contains
         !solve LY=b
         y(1) = b(1)
         do i=2,n
-            y(i) = b(i) - sum( a(i,1:i-1) * y(1:i-1) )
+            y(i) = b(i) - sum(a(i, 1:i-1)*y(1:i-1) )
         enddo
         !solve UX=Y where b as X
         b(n) = y(n) / a(n,n)
         do i=n-1,1,-1
-            b(i) = ( y(i) - sum( a(i,i+1:n) * b(i+1:n) ) ) / a(i,i)
+            b(i) = (y(i) - sum(a(i, i+1:n)*b(i+1:n)))/a(i,i)
         enddo
     end subroutine solveGeneralLES
     !dir$ else
@@ -129,13 +129,15 @@ contains
     real(rp),dimension(1:,1:),intent(inout)::   a
     real(rp),dimension(1:),intent(inout)::      b
     integer(isp),allocatable,dimension(:)::     ipiv
-        allocate(ipiv(max(1 , min(size(a,dim=1) , size(a,dim=2)))))
-        call getrf(a,ipiv)
-        call getrs(a,ipiv,b)
+
+        allocate(ipiv(max(1, min(size(a, 1), size(a, 2)))))
+        call getrf(a, ipiv)
+        call getrs(a, ipiv, b)
+
     end subroutine solveGeneralLES
     !dir$ end if
-    
-    
+
+
     !dir$ if .not. defined(noMKL)
     !solve general linear least square
     !m number of rows | n numer of columns | nrhs number of right-hand side, number of columns in B
@@ -148,16 +150,16 @@ contains
     real(rp),dimension(:,:),intent(inout):: a
     real(rp),dimension(:),intent(inout)::   b
     real(rp),dimension(size(b),1)::         b0
-        b0(:,1) = b
-        call gels(a,b0)
-        b = b0(:,1)
+        b0(:, 1) = b
+        call gels(a, b0)
+        b = b0(:, 1)
     end subroutine solveLinearLeastSquare_1rhs
 
     !see https://www.quora.com/Is-it-better-to-do-QR-Cholesky-or-SVD-for-solving-least-squares-estimate-and-why
-    !the different least square methods based on QR or SVD 
+    !the different least square methods based on QR or SVD
     pure subroutine solveLinearLeastSquare_nrhs(a,b)
     real(rp),dimension(:,:),intent(inout):: a,b
-        call gels(a,b)  !QR
+        call gels(a, b)  !QR
         !call gelss(a,b) !SVD, sigular value decomposition
     end subroutine solveLinearLeastSquare_nrhs
 
@@ -174,8 +176,8 @@ contains
         if(present(info)) info = i
     end subroutine solveLinearLeastSquare_Constrain
     !dir$ endif
-    
-    
+
+
     !dir$ if defined (noMKL)
     !dir$ else
     pure subroutine inverseGeneralSquareMat(a)
@@ -186,7 +188,7 @@ contains
         call getri(a,ipiv)
     end subroutine inverseGeneralSquareMat
     !dir$ end if
-    
+
     !dir$ if defined (noMKL)
     !dir$ else
     !if a is positive-definite matrix, it can be factor as a=R^TR
@@ -196,12 +198,12 @@ contains
         call potrf(a,'U')
     end subroutine choleskyFactorSym
     !dir$ end if
-    
+
     !dir$ if defined (noMKL)
     !input a [(2:n,1),(1:n,2),(1:n-1,3)]
     !refer to chasing method
     !limiting: abs(a)=>(a(1,2)>a(1,3)>0),((a(i,2)>a(i,1)+a(i,3)),(a(n,2)>a(n,1))
-    !a validation refer to 
+    !a validation refer to
     !https://wenku.baidu.com/view/a2065cb064ce0508763231126edb6f1aff0071d7.html
     !the lapackwrapper and chasing method seem no difference below...
     pure subroutine solveTridiagonalLES(a,b)
@@ -227,7 +229,7 @@ contains
             b(i) = b(i) - beta(i) * b(i+1)
         enddo
     end subroutine solveTridiagonalLES
-    !dir$ else    
+    !dir$ else
     pure subroutine solveTridiagonalLES(a,b)
     real(rp),dimension(1:,1:),intent(inout)::a
     real(rp),dimension(1:),intent(inout)::  b
@@ -237,8 +239,8 @@ contains
         call dttrsb(a(2:n,1),a(1:n,2),a(1:n-1,3),b)
     end subroutine solveTridiagonalLES
     !dir$ end if
-    
-    
+
+
 
 !--------------------------------------------------------------
     !emergency only and very limited
@@ -246,12 +248,12 @@ contains
     !this is only for square matrix, and without ipiv unlike getrf in lapack
     !--
     !this simple procedure may fail, details can refer to <LU decompostion> in wiki
-    !considering a11=0, then u11=0, U is singular. but A may be not singular, so a logic error 
+    !considering a11=0, then u11=0, U is singular. but A may be not singular, so a logic error
     !a Partial Pivoting is needed for a proper implementation, and waiting for improving
     pure subroutine triFactorSquareMat(m)
     real(rp),dimension(:,:),intent(inout):: m
     integer(ip)::                           i,j,n
-    
+
         !dir$ if defined (lwcheck)
         if(size(m,dim=1)/=size(m,dim=2)) call disableProgram
         !dir$ end if
@@ -271,11 +273,11 @@ contains
         do i=2,n
             m(i,n) = m(i,n) - sum(m(i,1:i-1)*m(1:i-1,n))
         enddo
-    
+
     end subroutine triFactorSquareMat
-    
-    
-    
+
+
+
 !-------------------------------------------------
     !gmres: suppose x is in the space x_0 + \mathcal(K)_m, then we have expression
     !x = x_0 + V_m y
@@ -303,33 +305,33 @@ contains
     real(rp),dimension(maxInr+1,maxInr)::   h
     integer(ip)::                           i,j,iter,jcopy
     real(rp)::                              beta,eps,av,t,mu
-    
+
         !outer loop
         do iter = 1,maxOtr
-            
+
             call csrAx(a,ia,ja,x,r); r = b - r
             beta = norm2(r)
             if(iter==1) eps = beta * rEps
             v(:,1) = r / beta
-            
+
             g = 0._rp; g(1) = beta
             h = 0._rp
-            
+
             !inner loop
             do j=1,maxInr
-            
+
                 jcopy = j
-            
+
                 call csrAx(a,ia,ja,v(:,j),v(:,j+1))
                 av = norm2(v(:,j+1))
-                
+
                 !--orth
                 do i=1,j
                     h(i,j) = v(:,j+1) .ip. v(:,i)
                     v(:,j+1) = v(:,j+1) - h(i,j)*v(:,i)
                 enddo
                 h(j+1,j) = norm2(v(:,j+1))
-                
+
                 !special deal for singular sparse matrix
                 if(h(j+1,j)/av < rEps) then
                     do i=1,j
@@ -339,65 +341,65 @@ contains
                     enddo
                     h(j+1,j) = norm2(v(:,j+1))
                 endif
-                
+
                 if(h(j+1,j)/=0._rp) v(:,j+1) = v(:,j+1) / h(j+1,j)
-                
+
                 !rot
                 if(j>1) then
                     do i=1,j-1
                         h(i:i+1,j) = rot2([c(i),s(i)],h(i:i+1,j))
                     enddo
                 endif
-                
+
                 mu = sqrt(sum(h(j:j+1,j)**2))
                 c(j) = h(j,j)/mu
                 s(j) = -h(j+1,j)/mu
                 h(j,j) = c(j) * h(j,j) - s(j) * h(j+1,j)
                 h(j+1,j) = 0._rp
-                
+
                 g(j:j+1) = rot2([c(j),s(j)] , g(j:j+1))
                 beta = abs(g(j+1))
-                
+
                 if(beta < eps) exit
-                
+
             enddo
-            
+
             j = jcopy - 1
             y(j+1) = g(j+1)/h(j+1,j+1)
-            
+
             do i=j,1,-1
                 y(i) = (g(i) - (h(i,i+1:j+1) .ip. y(i+1:j+1))) / h(i,i)
             enddo
-            
+
             do i=1,size(b)
                 x(i) = x(i) +  (v(i,1:j+1) .ip. y(1:j+1))
             enddo
-            
+
             if(beta < eps) exit
-            
+
         enddo
-        
+
     contains
-    
+
         !--
         pure subroutine Arnoldi(v,H,ksp)
         real(rp),dimension(:),intent(in)::      v
         real(rp),dimension(:,:),intent(inout):: H,ksp
-        
-            
-        
+
+
+
         end subroutine Arnoldi
-        
-        
+
+
         !--
         pure subroutine HouseholderArnoldi()
-        !real(rp),dimension(:),intent(in)::      
-        
+        !real(rp),dimension(:),intent(in)::
+
         end subroutine HouseholderArnoldi
-        
+
     end subroutine gmres
 
-!-----------------------------------------------    
+!-----------------------------------------------
     !dir$ if .not. defined(noMKL)
     !Ax=b | A=A(a,ia,ja) | input x0 output x |
     subroutine fgmresILUT(a,ia,ja,b,x)
@@ -411,26 +413,26 @@ contains
     real(8)::                               tol
     real(8),dimension(128)::                dpar
     real(8),dimension(:),allocatable::      tmp,bilut
-    
+
         n = size(x); nm1 = n-1
         !--
         maxfil = 1  !half bandwidth of preconditioner M=LU
         allocate(bilut((2*maxfil+1)*n - maxfil*(maxfil+1) + 1))
         allocate(jbilut((2*maxfil+1)*n - maxfil*(maxfil+1) + 1))
         allocate(ibilut(n+1))
-        
+
         !--
         ip15 = min(2,n) !restarted gmres, default min(150,n) which means no restarted gmres
                         !sometimes small ip15 is sufficient for convergence and sometimes large ipar15 is necessary
         allocate(tmp((2*ip15+1)*n + pidb2(ip15*(ip15+9)) + 1))
-        
+
         !--
         call dfgmres_init(n, x, b, rciRequest, ipar, dpar, tmp)
-        
+
         call preconditioner
-        
+
         call setCheck
-        
+
         !loop
         do; call dfgmres(n,x,b,rciRequest,ipar,dpar,tmp)
             select case(rciRequest)
@@ -450,11 +452,11 @@ contains
                 stop 'error: laWrapperLib/fgmresILUT fails'
             end select
         enddo
-        
+
         ipar(13) = 0 !update x
         call dfgmres_get(n, x, b, rciRequest, ipar, dpar, tmp, itercount)
         call mkl_free_buffers
-        
+
     contains
         !--
         subroutine preconditioner
@@ -476,7 +478,7 @@ contains
             call dfgmres_check(n, x, b, rciRequest, ipar, dpar, tmp)
         end subroutine setCheck
     end subroutine fgmresILUT
-    
+
     subroutine fgmres(a,ia,ja,b,x)
     real(8),dimension(:),intent(in)::       a
     integer(4),dimension(:),intent(in)::    ia,ja
@@ -485,7 +487,7 @@ contains
     integer(4),dimension(128)::             ipar
     real(8),dimension(128)::                dpar
     real(8),dimension(:),allocatable::      tmp
-    
+
         n = size(x); nm1 = n-1
         !--
         ip15 = min(2,n) !restarted gmres, default min(150,n) which means no restarted gmres
@@ -494,9 +496,9 @@ contains
 
         !--
         call dfgmres_init(n, x, b, rciRequest, ipar, dpar, tmp)
-        
+
         call setCheck
-        
+
         !loop
         do; call dfgmres(n,x,b,rciRequest,ipar,dpar,tmp)
             select case(rciRequest)
@@ -518,11 +520,11 @@ contains
                 stop 'error: laWrapperLib/fgmres fails'
             end select
         enddo
-        
+
         ipar(13) = 0 !update x
         call dfgmres_get(n, x, b, rciRequest, ipar, dpar, tmp, itercount)
         call mkl_free_buffers
-        
+
     contains
         !--
         subroutine SetCheck
@@ -539,10 +541,10 @@ contains
         end subroutine setCheck
     end subroutine fgmres
     !dir$ else
-    
+
     !dir$ end if
-    
-    
+
+
     !dir$ if .not. defined(noMKL)
     !ge[sparse representation of a general matrix]
     !mv[matrix-vector product ]
@@ -566,15 +568,17 @@ contains
         enddo
     end subroutine csrAx
     !dir$ end if
-    
-    pure function polyfit(x,y,n)
-    real(rp),dimension(:),intent(in)::  x,y
+
+	!y = c_i x^i | x(np), y(np), where m=np
+	!m<=n+1 underdetermination | m=n+1 determination | m>n+1 overdetermination
+    pure function polyfit(x, y, n)
+    real(rp),dimension(:),intent(in)::  x, y
     integer(ip),intent(in)::            n
     real(rp),dimension(0:n)::           polyfit
     real(rp),dimension(size(x),n+1)::   A
     real(rp),dimension(size(x))::       yt
-    integer(ip)::                       m,i,j
-    
+    integer(ip)::                       m, i, j
+
         m = size(x)
         if(m <= n) call disableprogram !underdetermination
 
@@ -584,10 +588,10 @@ contains
                 A(i,j) = x(i)**(j-1)
             enddo
         enddo
-        
+
         call solveLinearLeastSquare(A, yt)
         polyfit = yt(1:n+1)
-        
+
     end function polyfit
-    
+
 end module laWrapperLib

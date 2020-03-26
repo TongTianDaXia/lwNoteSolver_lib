@@ -1,0 +1,89 @@
+module GasMixture_
+use constants
+use matrixSym_
+use laWrapperLib
+use GasSpecies_
+implicit none
+
+	private
+	public:: GasMixture
+	
+	type GasMixture
+		
+		private
+		type(GasSpecies),dimension(:),&
+		allocatable::			sp_
+		
+		real(rp),dimension(:),&
+		allocatable::			massfrac_
+		
+		type(matrixSym),dimension(:),&
+		allocatable::			DfitCoef_
+		
+	contains
+	
+		procedure::		init
+		
+		procedure::		makeDfitCoef
+		
+		procedure::		ns
+	
+	end type GasMixture
+	
+	
+contains
+
+	
+	subroutine init(this, sp, massfrac)
+	class(GasMixture),intent(out)::				this
+	type(GasSpecies),dimension(:),intent(in)::	sp
+	real(rp),dimension(:),optional,intent(in)::	massfrac
+	
+		allocate(this%sp_, source=sp)
+		
+		if(present(massfrac)) allocate(this%massfrac_, source=massfrac)
+	
+	end subroutine init
+	
+	
+	!--
+	subroutine makeDfitCoef(this, Tlow, Thigh, np, fitOrder)
+	class(GasMixture),intent(inout)::	this
+	real(rp),intent(in)::				Tlow, Thigh
+	integer(ip),intent(in)::			np
+	integer(ip),optional,intent(in)::	fitOrder
+	integer(ip)::						i, j, k, l, n, ns
+	real(rp)::							dT, T
+	real(rp),dimension(:),allocatable::	logT, D
+	
+		n = merge(fitOrder, 3, present(fitOrder))
+		ns = this%ns()
+		dT = (Thigh - Tlow)/(np - 1)
+		
+		allocate(this%DfitCoef_(0:n))
+		call this%DfitCoef_%init(ns)
+		
+		!Ax = b
+		allocate(logT(np), D(np))
+		do j=1,ns
+			do i=1,j
+				do k=1,np
+					T = Tlow + dT*(k - 1)
+					D(k) = this%sp_(i)%D(this%sp_(j), T, p_atm)
+					logT(k) = log(T)
+				enddo
+				call this%DfitCoef_%sval(i, j, polyFit(logT, D, n))
+			enddo
+		enddo
+		
+	end subroutine makeDfitCoef
+	
+	!--
+	pure integer(ip) function ns(this)
+    class(GasMixture),intent(in)::   this
+
+        ns = size(this%sp_)
+
+    end function ns
+	
+end module GasMixture_

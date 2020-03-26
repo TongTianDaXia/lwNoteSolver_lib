@@ -4,12 +4,12 @@ use arrayOpsLib
 implicit none
 
     private
-    public:: factorial
+    public:: factorial, betafc
     public:: binomialCoef, combination
     public:: besseljn_roots
     
     
-!-------------------------------------------
+    !-------------------------------------------
     interface factorial
         procedure::  factorial_n
         procedure::  factorial_kn
@@ -33,6 +33,7 @@ contains
     pure integer(8) function factorial_n(n) result(factorial)
     integer(ip),intent(in)::    n
     integer(ip)::               i
+	
         factorial = 1
         if(n<=20) then
             do i=1,n
@@ -42,39 +43,54 @@ contains
             !integer(8) limit of factoral(20)
             call disableProgram
             !fast factorial, see wiki(Stirling's approximation, second order)
-            factorial = nint( sqrt(2._rp*pi*n) * (n/e)**n )
+            factorial = nint(sqrt(2._rp*pi*n)*(n/e)**n)
         endif
+		
     end function factorial_n
     
     pure integer(8) function factorial_kn(k,n) result(factorial)
     integer(ip),intent(in)::    k,n
     integer(ip)::               i
+	
         factorial = 1
         do i=k,n
             factorial = factorial*i
         enddo
+		
     end function factorial_kn
+	
+	
+	!--
+	pure real(rp) function betafc(a, b) result(bt)
+	real(rp),intent(in)::   a, b
+	
+	    bt = gamma(a)*gamma(b)/gamma(a + b)
+	
+	end function betafc
     
-!--------------------------------------------------
-    !refer to wiki <binomial coe>
-    !----------------------avoid overflow and roundoff of integer
-    !coef = factorial(n-k+1,n) / factorial(k)
+    !--------------------------------------------------
+    !refer to wiki <binomial coef>
+    !avoid overflow and roundoff of integer
+    !coef = factorial(n-k+1,n)/factorial(k)
     pure real(rp) function BinomialCoef_int(n,k) result(coef)
     integer(ip),intent(in)::    n,k
     integer(ip)::               mn,mx,i
-        mn = min(k,n-k)
+	
+        mn = min(k, n-k)
         if(mn<0) then
             coef = 0._rp
         elseif(mn==0) then
             coef = 1._rp
         else
-            mx = max(k,n-k)
-            coef = real(mx+1,kind=rp)
+            mx = max(k, n-k)
+            coef = real(mx+1, kind=rp)
             do i=2,mn
-                coef = coef * real(mx+i,kind=rp) / real(i,kind=rp)
+                coef = coef*real(mx+i, kind=rp)/real(i, kind=rp)
             enddo
         endif
+		
     end function BinomialCoef_int
+    
     !----------------------
     pure real(rp) function BinomialCoef_general(a,k) result(coef)
     real(rp),intent(in)::       a
@@ -85,11 +101,11 @@ contains
         do i =1,k
             up = up*(a-i+1)
         enddo
-        coef = up / dfloat( factorial(k) )
+        coef = up/real(factorial(k), kind=rp)
     end function BinomialCoef_general
     
     
-!---------------------------------------------------
+    !---------------------------------------------------
     !https://github.com/chebfun/chebfun/blob/34f92d12ca51003f5c0033bbeb4ff57ac9c84e78/besselroots.m
     pure function besseljn_roots(jn,n) result(rts)
     integer(ip),intent(in)::    jn,n
@@ -118,9 +134,9 @@ contains
                                         58.906983926080942_8,   &
                                         62.048469190227170_8]
 
-! McMahon's expansion. This expansion gives very accurate approximation 
-! for the sth zero (s >= 7) in the whole region V >=- 1, and moderate
-! approximation in other cases.
+        ! McMahon's expansion. This expansion gives very accurate approximation 
+        ! for the sth zero (s >= 7) in the whole region V >=- 1, and moderate
+        ! approximation in other cases.
         mu = 4._8*jn**2
         a1 = 1._8 / 8._8
         a3 = (7._8*mu-31._8)/384._8

@@ -54,6 +54,7 @@ implicit none
         !(p(1)--1--p(2)--1/2--x--1/2--p(3))
         procedure muscl2_scalar
         procedure muscl2_array
+        procedure muscl2_arrayarray
     end interface muscl2
     
     interface muscl2c
@@ -64,8 +65,8 @@ implicit none
     end interface muscl2c
     
     interface muscl2c_sp
-        procedure muscl2c_SpOrnoCoefs
-        procedure muscl2c_SpOrnoCoefsArray
+        procedure muscl2c_SpOrnoCoef
+        procedure muscl2c_SpOrnoCoefArray
     end interface muscl2c_sp
     
     interface muscl2c_spstd
@@ -76,11 +77,13 @@ implicit none
     interface weno5
         procedure:: weno5_scalar
         procedure:: weno5_array
+        procedure:: weno5_arrayarray
     end interface weno5
     
     interface weno5z    
         procedure:: weno5z_scalar
         procedure:: weno5z_array
+        procedure:: weno5z_arrayarray
     end interface weno5z
     
 contains
@@ -174,7 +177,8 @@ contains
     
         delta(1) = f(2) - f(1)
         delta(2) = f(3) - f(2)
-        r = delta(2)/(delta(1) + GlobalEps)
+        if(delta(1)==zero) delta(1) = GlobalEps
+        r = delta(2)/delta(1)
         !if limiter Phi is symmetric: Phi(r) = r*Phi(1/r), the orginal expression reduce to
         x = f(2) + 0.5_rp*Phi(r, ilimiter)*delta(1)
 
@@ -192,7 +196,7 @@ contains
             case(vanAlbada)
                 Phi = (r**2 + r)/(1._rp + r**2)
             case(superbee)
-                Phi = max(zero, min(2._rp*r, 1._rp), min(r,2._rp))
+                Phi = max(zero, min(2._rp*r, 1._rp), min(r, 2._rp))
             !asymmetric limiter
             !case(doubleMinmod)
             !    Phi = max(zero,min(2._rp*r, 1._rp, (1._rp+r)/2._rp))
@@ -212,21 +216,39 @@ contains
         forall(i=1:size(f,1)) x(i) = muscl2(f(i,:), ilimiter)
     end function muscl2_array
     
+    !--
+    pure function muscl2_arrayarray(f,ilimiter) result(x)
+    real(rp),dimension(:,:,:),intent(in)::      f
+    integer(ip),intent(in)::                    ilimiter
+    real(rp),dimension(size(f,1),size(f,2))::   x
+    integer(ip)::                               i
+        forall(i=1:size(f,1)) x(i,:) = muscl2(f(i,:,:), ilimiter)
+    end function  muscl2_arrayarray
+    
     
     !---------------------------------------------------------------
     !refer to <Semi-discrete central-upwind scheme for hyperbolic conservation laws 
     !           and Hamilton-Jacobi equations>
+    !implementation below leads to nan in some situation, abondon!
+    !leave here as a reference to compare with muscl2
+    !delta(1) = (f(2) - f(1))
+    !delta(2) = (f(3) - f(2))
+    !delta(3) = (f(3) - f(1))/2._rp
+    !r = delta(2)/(delta(1) + GlobalEps)
+    !beta = delta(3)/(delta(1) + GlobalEps)
+    !x = f(2) + 0.5_rp*max(zero, min(theta, theta*r, beta))*delta(1)
     pure real(rp) function muscl2c_scalar(f,theta) result(x)
     real(rp),dimension(:),intent(in)::  f
     real(rp),intent(in)::               theta
     real(rp),dimension(3)::             delta
-    real(rp)::                          r,beta
-        delta(1) = f(2) - f(1)
-        delta(2) = f(3) - f(2)
+        delta(1) = (f(2) - f(1))*theta
+        delta(2) = (f(3) - f(2))*theta
         delta(3) = (f(3) - f(1))/2._rp
-        r = delta(2)/(delta(1) + GlobalEps)
-        beta = delta(3)/(delta(1) + GlobalEps)
-        x = f(2) + 0.5_rp*max(zero, min(theta, theta*r, beta))*delta(1)
+        if(delta(1)*delta(2)<0._rp) then
+            x = f(2)
+        else
+            x = f(2) + 0.5_rp*delta(minloc(abs(delta), 1))
+        endif
     end function  muscl2c_scalar
     !--
     pure function muscl2c_array(f,theta) result(x)
@@ -246,31 +268,35 @@ contains
     end function  muscl2c_arrayarray
     
     !--Orno => orthonormal
-    pure function muscl2c_SpOrnoCoefs(f,theta) result(x)
+    pure function muscl2c_SpOrnoCoef(f, theta, beta) result(x)
     real(rp),dimension(:,:),intent(in)::        f
-    real(rp),intent(in)::                       theta
-    real(rp),dimension(size(f,1))::             x,r,beta
+    real(rp),intent(in)::                       theta, beta
+    real(rp),dimension(size(f,1))::             x
     real(rp),dimension(size(f,1),3)::           delta
     integer(ip)::                               loc
+    real(rp)::                                  nor,eps
         delta(:,1) = (f(:,2) - f(:,1))*theta
         delta(:,2) = (f(:,3) - f(:,2))*theta
         delta(:,3) = (f(:,3) - f(:,1))/2._rp
         !functional approah 1. check direction; 2. check variation
-        if((delta(:,1) .ip. delta(:,2)) < GlobalEps) then
+        nor = norm(delta(:,1))*norm(delta(:,2))
+        eps = nor*globaleps
+        if((delta(:,1).ip.delta(:,2)) + eps < nor*cos(beta)) then
             x(:) = f(:,2)
         else
             loc = minloc([norm2(delta(:,1)), norm2(delta(:,2)), norm2(delta(:,3))], 1)
             x(:) = f(:,2) + 0.5_rp*delta(:,loc)
         endif
-    end function muscl2c_SpOrnoCoefs
+        
+    end function muscl2c_SpOrnoCoef
     !--
-    pure function muscl2c_SpOrnoCoefsArray(f,theta) result(x)
+    pure function muscl2c_SpOrnoCoefArray(f,theta,beta) result(x)
     real(rp),dimension(:,:,:),intent(in)::      f
-    real(rp),intent(in)::                       theta
+    real(rp),intent(in)::                       theta, beta
     real(rp),dimension(size(f,1),size(f,2))::   x
     integer(ip)::                               i
-        forall(i=1:size(f,2)) x(:,i) = muscl2c_sp(f(:,i,:),theta)
-    end function  muscl2c_SpOrnoCoefsArray
+        forall(i=1:size(f,2)) x(:,i) = muscl2c_sp(f(:,i,:), theta, beta)
+    end function  muscl2c_SpOrnoCoefArray
     
     !Orno => orthonormal
     pure function muscl2c_SpOrnoStd(f,theta) result(x)
@@ -280,7 +306,7 @@ contains
     integer(ip)::                               n
         n = size(f,1)
         x(1) = muscl2c(f(1,:), theta)
-        x(2:n) = muscl2c_sp(f(2:n,:), theta)
+        x(2:n) = muscl2c_sp(f(2:n,:), theta, hfpi)
     end function muscl2c_SpOrnoStd
 
     !-------------
@@ -355,15 +381,22 @@ contains
         forall(i=1:size(f,1)) x(i) = weno5(f(i,:))
     end function weno5_array
     
+    !--dim(f,1&2) is field dimension and dim(f,3) is the node index
+    pure function weno5_arrayarray(f) result(x)
+    real(rp),dimension(:,:,:),intent(in)::      f
+    real(rp),dimension(size(f,1),size(f,2))::   x
+    integer(ip)::                               i
+        forall(i=1:size(f,1)) x(i,:) = weno5(f(i,:,:))
+    end function weno5_arrayarray
+    
     !refer to <An improved weighted essentially non-oscillatory scheme for hyperbolic conservation laws>
     !refer to <jcp - An improved WENO-Z scheme>
-    
     pure function weno5z_scalar(f) result(x)
-    real(rp),dimension(:),intent(in)::f
-    real(rp)::              x,s0,s1,s2,w0,w1,w2,w
-    real(rp),parameter::    eps = 1.e-40_rp
-    integer(ip),parameter:: p = 2
-    real(rp),parameter::    alpha1 = 0.25_rp, alpha2 = 13._rp/12._rp
+    real(rp),dimension(:),intent(in)::	f
+    real(rp)::							x,s0,s1,s2,w0,w1,w2,w
+    real(rp),parameter::				eps = 1.e-20_rp
+    integer(ip),parameter::				p = 2
+    real(rp),parameter::				alpha1 = 0.25_rp, alpha2 = 13._rp/12._rp
     
         !nonlinear indicator of smoothness
         s0 = alpha1*(f(1) - 4._rp*f(2) + 3._rp*f(3))**2 &
@@ -396,5 +429,13 @@ contains
     integer(ip)::                       i
         forall(i=1:size(f,1)) x(i) = weno5z(f(i,:))
     end function weno5z_array
+    
+    !--dim(f,1&2) is field dimension and dim(f,3) is the node index
+    pure function weno5z_arrayarray(f) result(x)
+    real(rp),dimension(:,:,:),intent(in)::      f
+    real(rp),dimension(size(f,1),size(f,2))::   x
+    integer(ip)::                               i
+        forall(i=1:size(f,1)) x(i,:) = weno5z(f(i,:,:))
+    end function weno5z_arrayarray
 
 end module interpolationLib

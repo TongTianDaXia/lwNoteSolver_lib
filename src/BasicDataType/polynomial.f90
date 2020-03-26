@@ -2,56 +2,25 @@ module polynomial_
 use constants
 use arrayOpsLib
 use SpecialFunctionLib
-use polynomialLib
 use IntegrationLib
 implicit none
     
     private
     public:: polynomial
     
+	!--zero
+    public:: zeroPolynomial
+	
     !--add special integrate method for polynomial
     public:: integrate
     
     !some related polynomials and function
-    !--zero
-    public:: zeroPolynomial
-    !--
     public:: multiPolynominal
-    
-    !--based on the recursive definition P_{i+1} = (x-alpha_i)*P_i - beta_i*P_{i-1}
-    public:: orthnormalPolynomial
-    public:: orthnormalPolynomialSet
-    
-    !--Legendre, use recursive method rather than explict expression to 
-    !   avoid failure due to large n for binomialCoef/factorial method
-    public:: LegendrePolynomial
-    public:: LegendrePolynomialSet
-    !the following polynomial is normalized for 
-    !\int_{-1}^{1} p_n p_m dx = \delta_{nm} | tip: the weight function is 1 here
-    !for probability density, the density function is {1/2}
-    public:: normalLegendrePolynomial
-    public:: normalLegendrePolynomialSet
-    
-    !--Hermite, use recursive method rather than explict expression
-    public:: HermitePolynomial
-    public:: HermitePolynomialSet
-    !the following polynomial is normalized for
-    !\int_{-\infty}^{\infty} p_n p_m e^{-x^2} dx = \delta_{nm}
-    !for probability density, the density function is {1/sqrt(2\pi)e^{-x^2/2}}
-    public:: normalHermitePolynomial
-    public:: normalHermitePolynomialSet
-    
-    !--chebyshev
-    public:: ChebyshevPolynomialT
-    public:: ChebyshevPolynomialTset
-    public:: ChebyshevPolynomialT_Clenshaw
-    
-    !--------------------------------------------------------------
-    !--
+
+    !-------
     type:: polynomial
     
         private
-        
         real(rp),allocatable,dimension(:):: coef_
         
     contains
@@ -75,12 +44,12 @@ implicit none
         procedure,private::     coef_i
         procedure,private::     coef_ptr
         !--
-        generic::           assignment(=)   => paEq
-        generic::           operator(+)     => psPlus,spPlus,ppPlus
-        generic::           operator(-)     => ppMinus,spMinus,psMinus,negativePoly
-        generic::           operator(*)     => ppMultiply,spmultiply,psMultiply
-        generic::           operator(/)     => psDivide
-        generic::           operator(==)    => ppjdEq
+        generic::   assignment(=)   => paEq
+        generic::   operator(+)     => psPlus,spPlus,ppPlus
+        generic::   operator(-)     => ppMinus,spMinus,psMinus,negativePoly
+        generic::   operator(*)     => ppMultiply,spmultiply,psMultiply
+        generic::   operator(/)     => psDivide
+        generic::   operator(==)    => ppjdEq
         !a strange override
         !https://software.intel.com/en-us/forums/intel-visual-fortran-compiler-for-windows/topic/713637
         procedure,pass(lhs),private::   paEq
@@ -127,14 +96,14 @@ contains
     pure subroutine init_ar(this,ar)
     class(polynomial),intent(out)::         this
     real(rp),dimension(0:),intent(in)::     ar
-        allocate(this%coef_,source = ar)
+        allocate(this%coef_(0:ubound(ar,1)), source = ar)
     end subroutine init_ar
     
     !--
     elemental subroutine init_ply(this,that)
     class(polynomial),intent(out)::     this
     class(polynomial),intent(in)::      that
-        allocate(this%coef_,source = that%coef_)
+        allocate(this%coef_(0:ubound(that%coef_,1)), source = that%coef_)
     end subroutine init_ply
 
     !--
@@ -172,7 +141,7 @@ contains
     class(polynomial),intent(in)::      this
     type(polynomial)::                  cthis
         cthis = this%contract()
-        degree = ubound(cthis%coef_,dim=1)
+        degree = ubound(cthis%coef_, 1)
     end function degree
     
     !--
@@ -188,7 +157,8 @@ contains
             endif
         enddo
         !source = x(0:n) => lbound = 1; so should scale the cp%coef_ lbound
-        allocate(cp%coef_(0:n) , source=this%coef_(0:n))
+        !don't delete any of (0:n), notice the meaning of each other
+        allocate(cp%coef_(0:n), source = this%coef_(0:n))
     end function contract
     
     !--
@@ -224,7 +194,7 @@ contains
         endif
     end function differential
     
-    !--Constructing
+    !--TODO
     pure subroutine realRoot(this,root)
     class(polynomial),intent(in)::                  this
     real(rp),dimension(:),allocatable,intent(out):: root
@@ -233,19 +203,19 @@ contains
     type(polynomial)::                              w
 
         root = 0._rp
-        call disableprogram    
+        call disableprogram
         !--
         w = this%contract()
-        n = ubound(w%coef_,dim=1)
+        n = ubound(w%coef_, 1)
         select case(n)
         case(0)
             return
         case(1)
-            call p1zero(w%coef_,root)
+            call p1zero(w%coef_, root)
         case(2)
-            call p2zero(w%coef_,root)
+            call p2zero(w%coef_, root)
         case default
-            call extremumSearch(w,root)
+            call extremumSearch(w, root)
         endselect
         
     contains
@@ -253,22 +223,28 @@ contains
         pure subroutine p1zero(a,root)
         real(rp),dimension(0:),intent(in)::             a
         real(rp),dimension(:),allocatable,intent(out):: root
-            allocate(root,source=[-a(0)/a(1)])
+		
+            allocate(root, source=[-a(0)/a(1)])
+			
         end subroutine p1zero
+		
         !--
         pure subroutine p2zero(a,root)
         real(rp),dimension(0:),intent(in)::             a
         real(rp),dimension(:),allocatable,intent(out):: root
         real(rp)::                                      d
-            d = a(1)**2 - 4._rp *a(0)*a(2)
+		
+            d = a(1)**2 - 4._rp*a(0)*a(2)
             if(d<0._rp) then
                 return
             elseif(d==0._rp) then
-                allocate(root,source=[-a(1)/a(2)/2._Rp])
+                allocate(root, source=[-a(1)/a(2)/2._Rp])
             else
-                allocate(root,source=[(-a(1)-sqrt(d))/a(2)/2._rp,(-a(1)+sqrt(d))/a(2)/2._rp])
+                allocate(root, source=[(-a(1)-sqrt(d))/a(2)/2._rp,(-a(1)+sqrt(d))/a(2)/2._rp])
             endif
+			
         end subroutine p2zero
+		
         !--hard to compute
         pure recursive subroutine extremumSearch(w,root)
         class(polynomial),intent(in)::                  w
@@ -304,13 +280,13 @@ contains
     pure subroutine paEq(lhs,rhs)
     class(polynomial),intent(out)::     lhs
     real(rp),dimension(0:),intent(in):: rhs
-        allocate(lhs%coef_,source=rhs)
+        allocate(lhs%coef_(0:ubound(rhs,1)), source = rhs)
     end subroutine paEq
     !--
     elemental type(polynomial) function psPlus(lhs,rhs) result(p)
     class(polynomial),intent(in)::      lhs
     real(rp),intent(in)::               rhs
-        allocate(p%coef_ , source = lhs%coef_)
+        allocate(p%coef_(0:ubound(lhs%coef_,1)), source = lhs%coef_)
         p%coef_(0) = p%coef_(0) + rhs
     end function psPlus
     !--
@@ -337,7 +313,7 @@ contains
     !--
     elemental type(polynomial) function negativePoly(rhs) result(p)
     class(polynomial),intent(in)::      rhs
-        allocate(p%coef_,source=rhs%coef_)
+        allocate(p%coef_(0:ubound(rhs%coef_,1)), source = rhs%coef_)
         p%coef_(:) = - p%coef_(:)
     end function negativePoly
     !--
@@ -362,7 +338,8 @@ contains
     class(polynomial),intent(in)::      lhs
     type(polynomial),intent(in)::       rhs
     integer(ip)::                       i,j,ld,rd
-        ld = lhs%degree();  rd =rhs%degree()
+        ld = lhs%degree()
+        rd = rhs%degree()
         call p%init(ld+rd)
         do j=0,ld
             do i=0,rd
@@ -375,8 +352,8 @@ contains
     class(polynomial),intent(in)::      lhs
     real(rp),intent(in)::               rhs
         if(rhs/=zero) then
-            allocate(p%coef_,source=lhs%coef_)
-            p%coef_ = rhs * p%coef_
+            allocate(p%coef_(0:ubound(lhs%coef_,1)), source = lhs%coef_)
+            p%coef_(:) = rhs*p%coef_
         else
             p = zeroPolynomial()
         endif
@@ -391,8 +368,8 @@ contains
     elemental type(polynomial) function psDivide(lhs,rhs) result(p)
     class(polynomial),intent(in)::      lhs
     real(rp),intent(in)::               rhs
-        allocate(p%coef_,source=lhs%coef_)
-        p%coef_ = p%coef_ / rhs
+        allocate(p%coef_(0:ubound(lhs%coef_,1)), source = lhs%coef_)
+        p%coef_ = p%coef_/rhs
     end function psDivide
     !--
     elemental logical(lp) function ppjdeq(lhs,rhs) result(l)
@@ -410,424 +387,21 @@ contains
         endif
     end function ppjdeq
     
-    
-    
 
-    !------------------------------------------------------------------
-    !specified polynomials
-    !------------------------------------------------------------------
-    !---------------------
-    elemental type(polynomial) function zeroPolynomial() result(z)
-        allocate(z%coef_(0:0)); z%coef_ = zero
-    end function zeroPolynomial
-    
-    
-    !--alpha(0:n-1),beta(0:n-1):-> generate poly(n)
-    !!--based on the recursive definition P_{i+1} = (x-alpha_i)*P_i - beta_i*P_{i-1}
-    pure type(polynomial) function orthnormalPolynomial(alpha,beta) result(poly)
-    real(rp),dimension(0:),intent(in)::         alpha,beta
-    type(polynomial)::                          x,tmp1,tmp2
-    integer(ip)::                               i,n
-    real(rp),dimension(size(alpha))::           qx,qw
-    real(rp)::                                  normalizer
-    
-        n = size(alpha)
-        
-        x = [0._rp,1._rp]
-        poly = [1._rp]
-        poly = (x - alpha(0))*poly
-        if(n==1) return
-        
-        tmp2 = [1._rp]
-        do i=2,n
-            tmp1 = poly
-            poly = (x-alpha(i-1))*tmp1 - beta(i-1)*tmp2
-            tmp2 = tmp1
-        enddo
-        
-        call GaussCev(alpha,beta,qx,qw)
-        
-        normalizer = sum(poly%funcval(qx)**2 * qw)
-        poly = poly/normalizer
-    
-    end function orthnormalPolynomial
-    !--
-    pure function orthnormalPolynomialSet(alpha,beta) result(poly)
-    real(rp),dimension(0:),intent(in)::         alpha,beta
-    type(polynomial),dimension(0:size(alpha)):: poly
-    type(polynomial)::                          x
-    integer(ip)::                               i,n
-    real(rp),dimension(size(alpha))::           qx,qw
-    real(rp)::                                  normalizer
-    
-        n = size(alpha)
-        
-        x = [0._rp,1._rp]
-        poly(0) = [1._rp]        
-        poly(1) = (x - alpha(0))*poly(0)
-        if(n==1) return
-        
-        do i=2,n
-            poly(i) = (x-alpha(i-1))*poly(i-1) - beta(i-1)*poly(i-2)
-        enddo
-        
-        call GaussCev(alpha,beta,qx,qw)
-        
-        do i=0,n
-            normalizer = sum(poly(i)%funcval(qx)**2 * qw)
-            poly(i) = poly(i)/normalizer
-        enddo
-    
-    end function orthnormalPolynomialSet
-    
-    
-    !---------------------
-    !n P_n = (2n-1) x P_{n-1} - (n-1) P_{n-2}
-    elemental type(polynomial) function LegendrePolynomial(n) result(poly)
-    integer(ip),intent(in)::            n
-    type(polynomial)::                  tm2,tm1,x
-    integer(ip)::                       i
-        if(n<=0) then
-            poly = [1._rp]
-        elseif(n==1) then
-            poly = [0._rp,1._rp]
-        else
-            x   = [0._rp,1._rp]
-            tm2 = [1._rp]
-            tm1 = x
-            do i = 2 , n
-                poly = (2._rp*i - 1._rp) * x * tm1 - (i - 1._rp) * tm2
-                poly = poly / real(i,kind=rp)
-                tm2 = tm1
-                tm1 = poly
-            enddo
-        endif
-    end function LegendrePolynomial
-    
-    !--
-    pure function LegendrePolynomialSet(n) result(poly)
-    integer(ip),intent(in)::            n
-    type(polynomial),dimension(0:n)::   poly
-    type(polynomial)::                  x
-    integer(ip)::                       i
-        if(n<=0) then
-            poly(0) = [1._rp]
-        elseif(n==1) then
-            poly(0) = [1._rp]
-            poly(1) = [0._rp,1._rp]
-        else
-            x   = [0._rp,1._rp]
-            poly(0) = [1._rp]
-            poly(1) = [0._rp,1._rp]
-            do i = 2 , n
-                poly(i) = (2._rp*i - 1._rp) * x * poly(i-1) - (i - 1._rp) * poly(i-2)
-                poly(i) = poly(i) / real(i,kind=rp)
-            enddo
-        endif
-    end function LegendrePolynomialSet
-    
-    !--
-    elemental type(polynomial) function normalLegendrePolynomial(n) result(poly)
-    integer(ip),intent(in)::                n
-        poly = sqrt(dfloat(2*n+1)/2.d0) * LegendrePolynomial(n)
-    end function normalLegendrePolynomial
-    
-    !--
-    pure function normalLegendrePolynomialSet(n) result(poly)
-    integer(ip),intent(in)::                n
-    type(polynomial),dimension(0:n)::       poly
-    integer(ip)::                           i
-        poly = LegendrePolynomialSet(n)
-        do i=0,n
-            poly(i) = sqrt(dfloat(2*i+1)/2.d0) * poly(i)
-        enddo
-    end function normalLegendrePolynomialSet
-    
-
-    !wiki(chebyshev polynomial) T(n) for first kind and U(n) for second kind
-    elemental type(polynomial) function ChebyshevPolynomialT(n) result(poly)
-    integer(ip),intent(in)::            n
-    type(polynomial)::                  tm2,tm1,x
-    integer(ip)::                       i
-        if(n<=0) then
-            poly = [1._rp]
-        elseif(n==1) then
-            poly = [0._rp,1._rp]
-        else
-            x   = [0._rp,1._rp]
-            tm2 = [1._rp]
-            tm1 = x
-            do i = 2 , n
-                poly = 2._rp*x*tm1 - tm2
-                tm2 = tm1
-                tm1 = poly
-            enddo
-        endif
-    end function ChebyshevPolynomialT
-    
-    !--
-    pure function ChebyshevPolynomialTset(n) result(poly)
-    integer(ip),intent(in)::            n
-    type(polynomial),dimension(0:n)::   poly
-    type(polynomial)::                  x
-    integer(ip)::                       i
-        if(n<=0) then
-            poly(0) = [1._rp]
-        elseif(n==1) then
-            poly(0) = [1._rp]
-            poly(1) = [0._rp,1._rp]
-        else
-            x       = [0._rp,1._rp]
-            poly(0) = [1._rp]
-            poly(1) = [0._rp,1._rp]
-            do i = 2 , n
-                poly(i) = 2._rp*x*poly(i-1) - poly(i-2)
-            enddo
-        endif
-    end function ChebyshevPolynomialTset
-    
-    !--compute sum_0^n(c*ChebPoly), sum = c(0)*T(0)%funcval(x)+......+c(n)*T(n)%funcval(x)
-    !use Clenshaw algorithm, see wiki
-    !https://github.com/chebfun/chebfun/blob/development/%40chebtech/clenshaw.m
-    pure real(rp) function ChebyshevPolynomialT_Clenshaw(x,c) result(s)
-    real(rp),intent(in)::               x
-    real(rp),dimension(0:),intent(in):: c
-    real(rp)::                          bk1,bk2,b,x2
-    integer(ip)::                       n,k
-        bk1 = 0._rp
-        bk2 = bk1
-        x2 = 2._rp * x   !double
-        n = ubound(c,dim=1)
-        do k=n,2,-2
-            bk2 = c(k) + x2*bk1 - bk2
-            bk1 = c(k-1) + x2*bk2 - bk1
-        enddo
-        if(ibits(n,0,1)==1) then
-            b = bk1
-            bk1 = c(1) + x2*bk1 - bk2
-            bk2 = b
-        endif
-        s = c(0) + x * bk1 - bk2
-    end function ChebyshevPolynomialT_Clenshaw
-    
-    
-    !---------------------
-    !H_n = 2x H_{n-1} - 2(n-1) H_{n-2}
-    !for w(x) = e^{-x^2} | <Hi,Hi>=sqrt(pi) 2^n n!
-    elemental type(polynomial) function HermitePhysPolynomial(n) result(poly)
-    integer(ip),intent(in)::            n
-    type(polynomial)::                  tm2,tm1,x
-    integer(ip)::                       i
-        if(n<=0) then
-            poly = [1._rp]
-        elseif(n==1) then
-            poly = [0._rp,2._rp]
-        else
-            x   = [0._rp,1._rp]
-            tm2 = [1._rp]
-            tm1 = 2._rp*x
-            do i = 2 , n
-                poly = 2._rp*x*tm1 - 2._rp*(i - 1._rp)*tm2
-                tm2 = tm1
-                tm1 = poly
-            enddo
-        endif
-    end function HermitePhysPolynomial
-    
-    !--
-    pure function HermitePhysPolynomialSet(n) result(poly)
-    integer(ip),intent(in)::            n
-    type(polynomial),dimension(0:n)::   poly
-    type(polynomial)::                  x
-    integer(ip)::                       i
-        if(n<=0) then
-            poly(0) = [1._rp]
-        elseif(n==1) then
-            poly(0) = [1._rp]
-            poly(1) = [0._rp,2._rp]
-        else
-            x   = [0._rp,1._rp]
-            poly(0) = [1._rp]
-            poly(1) = [0._rp,2._rp]
-            do i = 2 , n
-                poly(i) = 2._rp*x*poly(i-1) - 2._rp*(i - 1._rp)*poly(i-2)
-            enddo
-        endif
-    end function HermitePhysPolynomialSet
-    
-    !--
-    elemental type(polynomial) function normalHermitePhysPolynomial(n) result(poly)
-    integer(ip),intent(in)::                n
-        poly = (1._rp/sqrt(spi*2**n*factorial(n)))*HermitePhysPolynomial(n)
-    end function normalHermitePhysPolynomial
-    
-    !--
-    pure function normalHermitePhysPolynomialSet(n) result(poly)
-    integer(ip),intent(in)::                n
-    type(polynomial),dimension(0:n)::       poly
-    integer(ip)::                           i
-        poly = HermitePhysPolynomialSet(n)
-        do i=0,n
-            poly(i) = (1._rp/sqrt(spi*2**i*factorial(i)))*poly(i)
-        enddo
-    end function normalHermitePhysPolynomialSet
-    
-    
-    !---------------------
-    !H_n = x H_{n-1} - (n-1) H_{n-2}
-    !for w(x) = e^{-x^2/2} | <Hi,Hi>=sqrt(2*pi) n!
-    elemental type(polynomial) function HermiteProbPolynomial(n) result(poly)
-    integer(ip),intent(in)::            n
-    type(polynomial)::                  tm2,tm1,x
-    integer(ip)::                       i
-        if(n<=0) then
-            poly = [1._rp]
-        elseif(n==1) then
-            poly = [0._rp,1._rp]
-        else
-            x   = [0._rp,1._rp]
-            tm2 = [1._rp]
-            tm1 = x
-            do i = 2 , n
-                poly = x * tm1 - (i - 1._rp) * tm2
-                tm2 = tm1
-                tm1 = poly
-            enddo
-        endif
-    end function HermiteProbPolynomial
-    
-    !--
-    pure function HermiteProbPolynomialSet(n) result(poly)
-    integer(ip),intent(in)::            n
-    type(polynomial),dimension(0:n)::   poly
-    type(polynomial)::                  x
-    integer(ip)::                       i
-        if(n<=0) then
-            poly(0) = [1._rp]
-        elseif(n==1) then
-            poly(0) = [1._rp]
-            poly(1) = [0._rp,1._rp]
-        else
-            x   = [0._rp,1._rp]
-            poly(0) = [1._rp]
-            poly(1) = [0._rp,1._rp]
-            do i = 2 , n
-                poly(i) = x*poly(i-1) - (i - 1._rp)*poly(i-2)
-            enddo
-        endif
-    end function HermiteProbPolynomialSet
-    
-    !--
-    elemental type(polynomial) function normalHermiteProbPolynomial(n) result(poly)
-    integer(ip),intent(in)::                n
-        poly = (1._rp/sqrt(sqrt(2._rp)*spi*factorial(n)))*HermiteProbPolynomial(n)
-    end function normalHermiteProbPolynomial
-    
-    !--
-    pure function normalHermiteProbPolynomialSet(n) result(poly)
-    integer(ip),intent(in)::                n
-    type(polynomial),dimension(0:n)::       poly
-    integer(ip)::                           i
-        poly = HermiteProbPolynomialSet(n)
-        do i=0,n
-            poly(i) = (1._rp/sqrt(sqrt(2._rp)*spi*factorial(i)))*poly(i)
-        enddo
-    end function normalHermiteProbPolynomialSet
-    
-    
-    !------------------
-    elemental type(polynomial) function hermitePolynomial(n,var) result(p)
-    integer(ip),intent(in)::            n
-    character(*),optional,intent(in)::  var
-    
-        if(present(var)) then
-            if(var=='phys') then
-                p = HermitePhysPolynomial(n)
-            elseif(var=='prob') then
-                p = HermiteProbPolynomial(n)
-            else
-                call disableprogram
-            endif
-        else
-            p = HermitePhysPolynomial(n)
-        endif
-    
-    end function hermitePolynomial
-    
-    !--
-    pure function HermitePolynomialSet(n,var) result(p)
-    integer(ip),intent(in)::            n
-    character(*),optional,intent(in)::  var
-    type(polynomial),dimension(0:n)::   p
-    
-        if(present(var)) then
-            if(var=='phys') then
-                p = HermitePhysPolynomialSet(n)
-            elseif(var=='prob') then
-                p = HermiteProbPolynomialSet(n)
-            else
-                call disableprogram
-            endif
-        else
-            p = HermitePhysPolynomialSet(n)
-        endif
-    
-    end function HermitePolynomialSet
-    
-    !--
-    elemental type(polynomial) function normalHermitePolynomial(n,var) result(p)
-    integer(ip),intent(in)::            n
-    character(*),optional,intent(in)::  var
-    
-        if(present(var)) then
-            if(var=='phys') then
-                p = normalHermitePhysPolynomial(n)
-            elseif(var=='prob') then
-                p = normalHermiteProbPolynomial(n)
-            else
-                call disableprogram
-            endif
-        else
-            p = normalHermitePhysPolynomial(n)
-        endif
-    
-    end function normalHermitePolynomial
-    
-    !--
-    pure function normalHermitePolynomialSet(n,var) result(p)
-    integer(ip),intent(in)::            n
-    character(*),optional,intent(in)::  var
-    type(polynomial),dimension(0:n)::   p
-    
-        if(present(var)) then
-            if(var=='phys') then
-                p = normalHermitePhysPolynomialSet(n)
-            elseif(var=='prob') then
-                p = normalHermiteProbPolynomialSet(n)
-            else
-                call disableprogram
-            endif
-        else
-            p = normalHermitePhysPolynomialSet(n)
-        endif
-    
-    end function normalHermitePolynomialSet
-    
-    
-    
-    !--------------------------------------------------------------------------------
-    pure type(polynomial) function multiPolynominal_poly(sPolynomial,alpha) result(mp)
-    type(polynomial),dimension(0:),intent(in)::         sPolynomial
-    integer(ip),dimension(:),intent(in)::               alpha
-    integer(ip)::                                       i
+    !------
+    pure type(polynomial) function multiPolynominal_poly(sPolynomial, alpha) result(mp)
+    type(polynomial),dimension(0:),intent(in)::     sPolynomial
+    integer(ip),dimension(:),intent(in)::			alpha
+    integer(ip)::                                   i
 
         mp = [1._rp]
         do i=1,size(alpha)
-            mp = mp * sPolynomial(alpha(i))
+            mp = mp*sPolynomial(alpha(i))
         end do
         
     end function multiPolynominal_poly
     
+	!--
     pure type(polynomial) function multiPolynominal_heterPoly(sPolynomial,alpha) result(mp)
     type(polynomial),dimension(0:,:),intent(in)::       sPolynomial
     integer(ip),dimension(:),intent(in)::               alpha
@@ -835,36 +409,42 @@ contains
     
         mp = [1._rp]
         do i=1,size(alpha)
-            mp = mp * sPolynomial(alpha(i),i)
+            mp = mp*sPolynomial(alpha(i), i)
         end do
         
     end function multiPolynominal_heterPoly
     
-    pure real(rp) function multiPolynominal_polyval(sPolynomial,alpha,x) result(val)
+	!--
+    pure real(rp) function multiPolynominal_polyval(sPolynomial, alpha, x) result(val)
     type(polynomial),dimension(0:),intent(in)::         sPolynomial
     integer(ip),dimension(:),intent(in)::               alpha
     real(rp),dimension(:),intent(in)::                  x
     integer(ip)::                                       i
         
         val = 1._rp
-        do i=size(alpha),1,-1   !high order lead to small value
-            val = val * sPolynomial(alpha(i))%funcval(x(i))
+        do i=1,size(alpha)
+            val = val*sPolynomial(alpha(i))%funcval(x(i))
         end do
         
     end function multiPolynominal_polyval
     
-    pure real(rp) function multiPolynominal_heterPolyval(sPolynomial,alpha,x) result(val)
+	!--
+    pure real(rp) function multiPolynominal_heterPolyval(sPolynomial, alpha, x) result(val)
     type(polynomial),dimension(0:,:),intent(in)::       sPolynomial
     integer(ip),dimension(:),intent(in)::               alpha
     real(rp),dimension(:),intent(in)::                  x
     integer(ip)::                                       i
         
         val = 1._rp
-        do i=size(alpha),1,-1   !high order lead to small value
-            val = val * sPolynomial(alpha(i),i)%funcval(x(i))
+        do i=1,size(alpha)
+            val = val*sPolynomial(alpha(i), i)%funcval(x(i))
         end do
         
     end function multiPolynominal_heterPolyval
-    
+	
+	!---------------------
+    elemental type(polynomial) function zeroPolynomial() result(z)
+        allocate(z%coef_(0:0)); z%coef_ = zero
+    end function zeroPolynomial
     
 end module polynomial_

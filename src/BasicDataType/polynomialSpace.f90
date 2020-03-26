@@ -8,8 +8,9 @@ use arrayOpsLib
 use stringOpsLib
 use IntegrationLib
 use laWrapperLib
-use quadprogWrapper
+use quadprogWrapperLib
 use polynomial_
+use specialPolynomial_
 implicit none
 
     private
@@ -138,7 +139,7 @@ contains
         this%quadnp_ = merge(np, 4*(truncOrder+1), present(np))
         
         !--
-        allocate(this%basis_, source=basis)
+        allocate(this%basis_(0:ubound(basis,1)), source = basis)
         
         !--
         t = basisType
@@ -193,7 +194,7 @@ contains
             ba = sqrt(2._rp)*ba
         case(polytype(2))
             ba = normalHermitePolynomialSet(od, 'prob')
-            ba = sqrt(sqrt(2._rp)*spi)*ba
+            ba = sqrt(sqrt(2._rp)*srpi)*ba
         case default
             stop 'error: polynomialSpace/init_od get error type'
         end select
@@ -223,7 +224,8 @@ contains
         np = quadnp
         od = ubound(basis, 1)
         
-        !assume the accuracy of quadrature rule is N(clenshawcurtis eg.), guarantee the tribasis computation
+        !assume the accuracy of quadrature rule is N(clenshawcurtis eg.), 
+        !guarantee the tribasis computation
         if(np<3*od) stop 'error: AskyPolynomialSpace/makeOpsCoef get a bad np or order'
         
         !do not store x, but the value of polynomial in x

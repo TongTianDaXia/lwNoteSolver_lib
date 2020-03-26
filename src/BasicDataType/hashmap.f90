@@ -240,7 +240,7 @@ contains
         bid = modulo(hashfunc(key),this%mapsize()) + 1
     end function bid
     
-    pure integer(ip) function maxcol(this) result(mc)
+    integer(ip) function maxcol(this) result(mc)
     class(hashmap),intent(in)::             this
     integer(ip)::                           i,d
         mc = 0
@@ -250,7 +250,7 @@ contains
         enddo
     end function maxcol
     
-    pure integer(ip) function ncol(this) result(nc)
+    integer(ip) function ncol(this) result(nc)
     class(hashmap),intent(in)::             this
     integer(ip)::                           i,d
         nc = 0
@@ -262,7 +262,7 @@ contains
     end function ncol
     
     !--
-    pure integer(ip) function nkey(this) result(nk)
+    integer(ip) function nkey(this) result(nk)
     class(hashmap),intent(in)::             this
     integer(ip)::                           i
         nk = 0

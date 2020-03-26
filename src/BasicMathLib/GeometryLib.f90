@@ -29,6 +29,11 @@ implicit none
         procedure:: polygonArea
     end interface geoArea
     
+    interface geoVol
+        procedure:: tetrahedronVolume
+        procedure:: hexVol
+    end interface geoVol
+    
     
 contains
 
@@ -75,7 +80,8 @@ contains
     !---------------------------------------------------
     !geometry in 3d
     !---------------------------------------------------
-    !v = 1/6 det{p1-p4,p2-p4,p3-p4} = |(p1-p4) .ip. ((p2-p4) .cp. p3-p4)| / 6
+    !free of order of (p1,p2,p3,p4)
+    !v = 1/6 det{p1-p4,p2-p4,p3-p4} = |(p1-p4) .ip. ((p2-p4) .cp. p3-p4)|/6
     pure real(rp) function tetrahedronVolume(p1,p2,p3,p4)
     real(rp),dimension(:),intent(in)::  p1,p2,p3,p4
         tetrahedronVolume = (p1-p4) .ip. ((p2-p4) .cpv. (p3-p4))
@@ -83,7 +89,14 @@ contains
     end function tetrahedronVolume
     
     
-    
+    !--
+    !p1-p2-p3-p4
+    !p5-p6-p7-p8
+    pure real(rp) function hexVol(p1,p2,p3,p4,p5,p6,p7,p8)
+    real(rp),dimension(:),intent(in)::  p1,p2,p3,p4,p5,p6,p7,p8
+        call disableprogram()
+        hexVol = 0._rp
+    end function hexVol
     
     
     !------------------------------------------------------
